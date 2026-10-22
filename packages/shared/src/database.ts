@@ -117,6 +117,113 @@ export type Database = {
           },
         ]
       }
+      previews: {
+        Row: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          beard_style_id: string
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          hair_style_id: string
+          id?: string
+          not_before?: string
+          priority?: number
+          purged_at?: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status?: Database["public"]["Enums"]["preview_status"]
+          storage_path?: string | null
+          thumbnail_path?: string | null
+          visit_id: string
+        }
+        Update: {
+          attempt_count?: number
+          beard_style_id?: string
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          hair_style_id?: string
+          id?: string
+          not_before?: string
+          priority?: number
+          purged_at?: string | null
+          slot?: Database["public"]["Enums"]["photo_slot"]
+          status?: Database["public"]["Enums"]["preview_status"]
+          storage_path?: string | null
+          thumbnail_path?: string | null
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "previews_beard_style_id_fkey"
+            columns: ["beard_style_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_top_beard_styles"
+            referencedColumns: ["style_id"]
+          },
+          {
+            foreignKeyName: "previews_beard_style_id_fkey"
+            columns: ["beard_style_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_top_hair_styles"
+            referencedColumns: ["style_id"]
+          },
+          {
+            foreignKeyName: "previews_beard_style_id_fkey"
+            columns: ["beard_style_id"]
+            isOneToOne: false
+            referencedRelation: "styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "previews_hair_style_id_fkey"
+            columns: ["hair_style_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_top_beard_styles"
+            referencedColumns: ["style_id"]
+          },
+          {
+            foreignKeyName: "previews_hair_style_id_fkey"
+            columns: ["hair_style_id"]
+            isOneToOne: false
+            referencedRelation: "dashboard_top_hair_styles"
+            referencedColumns: ["style_id"]
+          },
+          {
+            foreignKeyName: "previews_hair_style_id_fkey"
+            columns: ["hair_style_id"]
+            isOneToOne: false
+            referencedRelation: "styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "previews_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shops: {
         Row: {
           created_at: string
@@ -277,6 +384,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visits_chosen_preview_fkey"
+            columns: ["chosen_preview_id", "id"]
+            isOneToOne: false
+            referencedRelation: "previews"
+            referencedColumns: ["id", "visit_id"]
+          },
+          {
             foreignKeyName: "visits_client_id_shop_id_fkey"
             columns: ["client_id", "shop_id"]
             isOneToOne: false
@@ -343,14 +457,163 @@ export type Database = {
       }
     }
     Functions: {
+      claim_previews: {
+        Args: { n: number; stale_after: string }
+        Returns: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "previews"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      complete_preview: {
+        Args: { id: string; storage_path: string; thumbnail_path: string }
+        Returns: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "previews"
+          isOneToOne: true
+          isSetofReturn: true
+        }
+      }
       current_shop_id: { Args: never; Returns: string }
+      enqueue_front_previews: { Args: { visit_id: string }; Returns: undefined }
+      fail_preview: {
+        Args: {
+          error: string
+          id: string
+          retry_at?: string
+          status: Database["public"]["Enums"]["preview_status"]
+        }
+        Returns: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "previews"
+          isOneToOne: true
+          isSetofReturn: true
+        }
+      }
+      is_keep_style: { Args: { style_id: string }; Returns: boolean }
       is_owner: { Args: never; Returns: boolean }
       local_period_start: { Args: { unit: string }; Returns: string }
       new_share_token: { Args: never; Returns: string }
+      preview_priority: { Args: { kind: string }; Returns: number }
+      request_preview: {
+        Args: {
+          beard_style_id: string
+          hair_style_id: string
+          slot: Database["public"]["Enums"]["photo_slot"]
+          visit_id: string
+        }
+        Returns: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "previews"
+          isOneToOne: true
+          isSetofReturn: true
+        }
+      }
+      retry_preview: {
+        Args: { id: string }
+        Returns: {
+          attempt_count: number
+          beard_style_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          hair_style_id: string
+          id: string
+          not_before: string
+          priority: number
+          purged_at: string | null
+          slot: Database["public"]["Enums"]["photo_slot"]
+          status: Database["public"]["Enums"]["preview_status"]
+          storage_path: string | null
+          thumbnail_path: string | null
+          visit_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "previews"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       barber_role: "owner" | "barber"
       photo_slot: "front" | "left" | "right" | "back"
+      preview_status: "pending" | "running" | "done" | "failed" | "refused"
       style_dimension: "hair" | "beard"
       upload_status: "uploading" | "uploaded"
       visit_status: "open" | "closed"
@@ -483,6 +746,7 @@ export const Constants = {
     Enums: {
       barber_role: ["owner", "barber"],
       photo_slot: ["front", "left", "right", "back"],
+      preview_status: ["pending", "running", "done", "failed", "refused"],
       style_dimension: ["hair", "beard"],
       upload_status: ["uploading", "uploaded"],
       visit_status: ["open", "closed"],
