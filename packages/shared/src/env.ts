@@ -34,5 +34,6 @@ export const GATE_ENV = {
   mobileSupabaseAnonKey: MOBILE_ENV.supabaseAnonKey,
 } as const;
 
-export const IMAGE_PROVIDERS = ['gemini', 'flux', 'seedream'] as const;
+// `fake` answers with a fixed image, for tests and local runs.
+export const IMAGE_PROVIDERS = ['gemini', 'flux', 'seedream', 'fake'] as const;
 export type ImageProviderName = (typeof IMAGE_PROVIDERS)[number];
