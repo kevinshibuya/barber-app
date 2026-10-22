@@ -1,4 +1,6 @@
-export const BARBER_ROLES = ['owner', 'barber'] as const;
+import { Constants } from './database';
+
+export const BARBER_ROLES = Constants.public.Enums.barber_role;
 export type BarberRole = (typeof BARBER_ROLES)[number];
 
 export function isBarberRole(value: unknown): value is BarberRole {

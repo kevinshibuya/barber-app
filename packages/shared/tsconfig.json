@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": ".",
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "target": "ES2022",
@@ -8,5 +9,5 @@
     "isolatedModules": true,
     "esModuleInterop": true
   },
-  "include": ["src", "tests", "jest.config.ts"]
+  "include": ["src", "scripts", "tests", "jest.config.ts"]
 }

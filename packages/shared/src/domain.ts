@@ -1,15 +1,22 @@
 // The domain as the app and the worker exchange it, after the database's
 // snake_case columns are mapped to camelCase. The schema tickets own the
-// columns; these types follow them.
+// columns; these types follow them. The row types themselves, as Supabase
+// returns them, are `Tables<'visits'>` and friends in `./database`, generated
+// with `pnpm --filter @barber/shared run db:types`.
+import { Constants } from './database';
 
-export const PHOTO_SLOTS = ['front', 'left', 'right', 'back'] as const;
+// The database's enums, in the database's order.
+export const PHOTO_SLOTS = Constants.public.Enums.photo_slot;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 
-export const STYLE_DIMENSIONS = ['hair', 'beard'] as const;
+export const STYLE_DIMENSIONS = Constants.public.Enums.style_dimension;
 export type StyleDimension = (typeof STYLE_DIMENSIONS)[number];
 
-export const VISIT_STATUSES = ['open', 'closed'] as const;
+export const VISIT_STATUSES = Constants.public.Enums.visit_status;
 export type VisitStatus = (typeof VISIT_STATUSES)[number];
+
+export const UPLOAD_STATUSES = Constants.public.Enums.upload_status;
+export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
 
 export const PREVIEW_STATUSES = ['pending', 'running', 'done', 'failed', 'refused'] as const;
 export type PreviewStatus = (typeof PREVIEW_STATUSES)[number];
@@ -17,6 +24,7 @@ export type PreviewStatus = (typeof PREVIEW_STATUSES)[number];
 export interface Shop {
   id: string;
   name: string;
+  createdAt: string;
 }
 
 export interface Client {
@@ -32,8 +40,12 @@ export interface Style {
   dimension: StyleDimension;
   slug: string;
   name: string;
+  // `<dimension>/<slug>.png` in the styles bucket; null for keep.
   referenceImagePath: string | null;
+  // Null for keep, which is never generated.
+  prompt: string | null;
   sortOrder: number;
+  active: boolean;
 }
 
 export interface Visit {
@@ -42,11 +54,17 @@ export interface Visit {
   clientId: string;
   barberId: string;
   consentGiven: boolean;
+  consentAt: string | null;
   status: VisitStatus;
   chosenHairStyleId: string | null;
   chosenBeardStyleId: string | null;
   chosenPreviewId: string | null;
   afterPhotoPath: string | null;
+  // The client page is `/v/<shareToken>`; null once the link has expired and
+  // been cleared.
+  shareToken: string | null;
+  shareExpiresAt: string | null;
+  providerName: string | null;
   createdAt: string;
   closedAt: string | null;
 }
@@ -58,6 +76,7 @@ export interface Photo {
   storagePath: string;
   width: number;
   height: number;
+  uploadStatus: UploadStatus;
 }
 
 export interface Preview {
