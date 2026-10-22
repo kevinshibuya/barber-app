@@ -1,0 +1,14 @@
+{
+  "name": "barber-app",
+  "private": true,
+  "packageManager": "pnpm@11.5.2",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  }
+}
