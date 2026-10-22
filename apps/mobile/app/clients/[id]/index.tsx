@@ -63,7 +63,19 @@ export default function ClientScreen() {
         data={visits ?? []}
         keyExtractor={(visit) => visit.id}
         ListHeaderComponent={<Text variant="large">{strings.client.visits}</Text>}
-        renderItem={({ item }) => <VisitRow visit={item} showClient={false} />}
+        renderItem={({ item }) => (
+          <VisitRow
+            visit={item}
+            showClient={false}
+            onPress={() =>
+              router.push({
+                // An open visit resumes at its photos; a closed one opens read-only.
+                pathname: item.status === 'open' ? '/visits/[id]/photos' : '/visits/[id]/finish',
+                params: { id: item.id },
+              })
+            }
+          />
+        )}
         ListEmptyComponent={visits ? <Text variant="muted">{strings.client.noVisits}</Text> : undefined}
       />
     </Screen>

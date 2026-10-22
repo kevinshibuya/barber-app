@@ -1,5 +1,14 @@
-import type { Photo, PhotoSlot, UploadStatus } from '@barber/shared';
-import { type ImageTool, type LocalImage, type PhotoTransport, type PhotoUpload, photoUploader } from '@/api/photos';
+import type { Photo, PhotoSlot, UploadStatus, Visit } from '@barber/shared';
+import {
+  type AfterPhotoTransport,
+  afterPhotoUploader,
+  type ImageTool,
+  type LocalImage,
+  type PhotoTransport,
+  type PhotoUpload,
+  photoUploader,
+} from '@/api/photos';
+import { openVisit } from './support/fixtures';
 
 // A device that re-encodes exactly as asked, to a new file each time.
 function fakeImages(): ImageTool {
@@ -134,5 +143,65 @@ describe('photo upload', () => {
     expect(retake.storagePath).toMatch(/^s1\/v1\/front\.[a-z0-9]+\.jpg$/);
     expect([...network.objects.keys()]).toEqual([retake.storagePath]);
     expect(network.rows.get('v1/front')).toMatchObject({ storagePath: retake.storagePath, uploadStatus: 'uploaded' });
+  });
+});
+
+// One visit of shop s1 and the originals bucket. The visit records an after
+// photo only when its object is already there.
+function fakeAfterNetwork() {
+  let visit: Visit = openVisit();
+  const objects = new Map<string, LocalImage>();
+  let failNextPut = false;
+
+  const transport: AfterPhotoTransport = {
+    async visitOf() {
+      return visit;
+    },
+    async putOriginal(path, image) {
+      if (failNextPut) {
+        failNextPut = false;
+        throw new Error('network down');
+      }
+      objects.set(path, image);
+    },
+    async recordAfterPhoto(_visitId, path) {
+      if (!objects.has(path)) throw new Error(`no object at ${path}`);
+      visit = { ...visit, afterPhotoPath: path };
+      return visit;
+    },
+  };
+
+  return {
+    transport,
+    objects,
+    visit: () => visit,
+    failNextPut: () => {
+      failNextPut = true;
+    },
+  };
+}
+
+describe('after photo upload', () => {
+  const after: LocalImage = { uri: 'file:///camera/after.heic', width: 3024, height: 4032 };
+
+  it('downscales the photo to the after path of the visit and records it there', async () => {
+    const network = fakeAfterNetwork();
+    const upload = afterPhotoUploader(network.transport, fakeImages());
+
+    const visit = await upload('v1', after);
+
+    expect([...network.objects.keys()]).toEqual(['s1/v1/after.jpg']);
+    expect(network.objects.get('s1/v1/after.jpg')).toMatchObject({ width: 768, height: 1024 });
+    expect(visit.afterPhotoPath).toBe('s1/v1/after.jpg');
+  });
+
+  it('leaves the visit without an after photo when the upload fails', async () => {
+    const network = fakeAfterNetwork();
+    const upload = afterPhotoUploader(network.transport, fakeImages());
+    network.failNextPut();
+
+    await expect(upload('v1', after)).rejects.toThrow('network down');
+
+    expect(network.visit().afterPhotoPath).toBeNull();
   });
 });
