@@ -27,7 +27,7 @@ async function bootstrap(): Promise<void> {
     staleAfterSeconds: config.staleAfterSeconds,
   });
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule.forRoot({ db }));
   await app.listen(Number(process.env[WORKER_ENV.port] ?? 3000));
   previews.start();
 
