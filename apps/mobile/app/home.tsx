@@ -3,7 +3,14 @@ import { VisitRow } from '@/components/visit-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type VisitSummary, listOpenVisitsToday, listRecentVisits, searchClients, signOut } from '@/api';
+import {
+  type VisitSummary,
+  getCurrentBarber,
+  listOpenVisitsToday,
+  listRecentVisits,
+  searchClients,
+  signOut,
+} from '@/api';
 import { strings } from '@/lib/strings';
 import type { Client } from '@barber/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -77,11 +84,30 @@ function useHomeVisits() {
   return { visits, openToday, failed, refreshing, refresh };
 }
 
+// Whether the signed-in barber owns the shop, which shows the dashboard entry.
+function useIsOwner() {
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    getCurrentBarber().then(
+      (barber) => current && setIsOwner(barber?.role === 'owner'),
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  return isOwner;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const search = useClientSearch(query);
   const recent = useHomeVisits();
+  const isOwner = useIsOwner();
 
   async function leave() {
     await signOut().catch(() => undefined);
@@ -133,6 +159,11 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <View className="gap-2 pb-2">
               <View className="flex-row items-center justify-end">
+                {isOwner && (
+                  <Button variant="ghost" size="sm" onPress={() => router.push('/dashboard')}>
+                    <Text>{strings.dashboard.open}</Text>
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onPress={leave}>
                   <Text>{strings.home.signOut}</Text>
                 </Button>
