@@ -5,6 +5,10 @@ import { promisify } from 'node:util';
 import { KEEP_STYLE_SLUG, STORAGE_BUCKETS, STYLE_DIMENSIONS } from '../src';
 import { must, serviceClient } from './support/supabase';
 
+// Two script runs that each upload the whole 23 MB set, then a download of
+// every object: under load this outlasts the 30 s default.
+jest.setTimeout(120_000);
+
 const run = promisify(execFile);
 const service = serviceClient();
 const packageDir = join(__dirname, '..');
