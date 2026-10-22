@@ -48,4 +48,5 @@ export EXPO_PUBLIC_SUPABASE_URL="$api_url"
 export EXPO_PUBLIC_SUPABASE_ANON_KEY="$anon_key"
 
 cd "$REPO_ROOT"
-pnpm --filter "$filter" run "$script" "$@"
+# --fail-if-no-match: a mistyped filter runs nothing, which pnpm calls success.
+pnpm --filter "$filter" --fail-if-no-match run "$script" "$@"
