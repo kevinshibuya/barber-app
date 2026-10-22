@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
   );
   const previews = new PreviewWorker({
     db,
-    provider: createImageProvider(config.provider),
+    provider: createImageProvider(config.provider, process.env),
     concurrency: config.concurrency,
     staleAfterSeconds: config.staleAfterSeconds,
   });
