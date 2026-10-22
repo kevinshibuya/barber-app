@@ -3,6 +3,8 @@ module.exports = {
   preset: 'jest-expo',
   roots: ['<rootDir>/tests'],
   testRegex: '\\.test\\.tsx?$',
+  // jest-expo turns this on; a gate naming a missing test file must fail.
+  passWithNoTests: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
     // NativeWind compiles global.css at bundle time; tests need no styles.
