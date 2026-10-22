@@ -1,5 +1,5 @@
-import type { Barber, Client, Visit } from '@barber/shared';
-import type { VisitPhoto, VisitSummary } from '@/api';
+import type { Barber, Client, StyleDimension, Visit } from '@barber/shared';
+import type { CatalogStyle, VisitPhoto, VisitSummary } from '@/api';
 
 export const rafa: Barber = { id: 'b1', shopId: 's1', displayName: 'Rafa', role: 'owner' };
 
@@ -61,5 +61,19 @@ export function uploadedPhoto(overrides: Partial<VisitPhoto> = {}): VisitPhoto {
     uploadStatus: 'uploaded',
     url: 'https://storage.test/front.jpg',
     ...overrides,
+  };
+}
+
+export function keepStyle(dimension: StyleDimension): CatalogStyle {
+  return {
+    id: `${dimension}-keep`,
+    dimension,
+    slug: 'keep',
+    name: 'Manter como está',
+    referenceImagePath: null,
+    prompt: null,
+    sortOrder: 0,
+    active: true,
+    referenceImageUrl: null,
   };
 }

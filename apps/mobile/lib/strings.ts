@@ -91,8 +91,25 @@ export const strings = {
     cameraDenied: 'Permita o acesso à câmera nas configurações do celular.',
     continue: 'Continuar',
   },
+  // Keys and copy from docs/design/picker-references.md.
   picker: {
-    title: 'Escolher visual',
+    tab: { hair: 'Cabelo', beard: 'Barba' },
+    tile: {
+      keep: 'Manter como está',
+      generating: 'Gerando…',
+      failed: 'Falhou · toque para tentar',
+      refused: 'Indisponível',
+    },
+    choose: 'Escolher este visual',
+    chosen: 'Visual escolhido',
+    chooseError: 'Não deu para salvar a escolha. Tente de novo.',
+    finish: 'Finalizar',
+    a11y: { back: 'Voltar' },
+    loadFailed: 'Não foi possível abrir a visita.',
+    retry: 'Tentar de novo',
+  },
+  finish: {
+    title: 'Finalizar visita',
     comingSoon: 'Em breve.',
   },
   notFound: {
