@@ -8,6 +8,5 @@ export * from './clients';
 export * from './dashboard';
 export * from './photos';
 export * from './previews';
-export * from './share';
 export * from './styles';
 export * from './visits';
