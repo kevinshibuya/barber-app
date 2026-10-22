@@ -4,7 +4,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
 import { type PickResult, pickPhoto } from '@/lib/pick-photo';
 import { strings } from '@/lib/strings';
-import { rafa, uploadedPhoto, visit } from './support/fixtures';
+import { client, keepStyle, openVisit, rafa, uploadedPhoto, visit } from './support/fixtures';
 
 // The camera and the gallery are the device's; each test scripts the shot.
 jest.mock('@/lib/pick-photo');
@@ -129,6 +129,10 @@ describe('photo slots', () => {
   });
 
   it('resumes with the photos already uploaded, and continues to the picker', async () => {
+    jest.mocked(api.getVisit).mockResolvedValue(openVisit());
+    jest.mocked(api.getClient).mockResolvedValue(client());
+    jest.mocked(api.listStyles).mockResolvedValue([keepStyle('hair'), keepStyle('beard')]);
+    jest.mocked(api.subscribeToPreviews).mockReturnValue(() => undefined);
     jest.mocked(api.listVisitPhotos).mockResolvedValue([
       uploadedPhoto({ slot: 'front', url: 'https://storage.test/front.jpg' }),
       uploadedPhoto({ id: 'p2', slot: 'left', storagePath: 's1/v1/left.jpg', uploadStatus: 'uploading', url: null }),
@@ -142,7 +146,7 @@ describe('photo slots', () => {
 
     await fireEvent.press(continueButton());
 
-    expect(await screen.findByText(strings.picker.title)).toBeOnTheScreen();
+    expect(await screen.findByRole('tab', { name: strings.picker.tab.hair })).toBeOnTheScreen();
     expect(router.getPathname()).toBe('/visits/v1/picker');
   });
 });

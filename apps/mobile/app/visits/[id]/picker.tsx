@@ -1,13 +1,231 @@
+import { FormError } from '@/components/form-error';
+import { CAPTION_SCRIM, PickerTile } from '@/components/picker-tile';
 import { Screen } from '@/components/screen';
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import {
+  chooseLook,
+  getClient,
+  getVisit,
+  listStyles,
+  listVisitPhotos,
+  retryPreview,
+  subscribeToPreviews,
+  type VisitPreview,
+} from '@/api';
+import { type Catalog, lookFor, type Selection, selectable, type Tile, tilesFor, toCatalog } from '@/lib/picker';
 import { strings } from '@/lib/strings';
+import { cn } from '@/lib/utils';
+import { STYLE_DIMENSIONS, type StyleDimension, type Visit } from '@barber/shared';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-// The hair and beard tabs replace this in the picker ticket.
+// The header's scrim, darkest at the top edge, so its white text reads on any photo.
+const HEADER_SCRIM = { backgroundImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent)' };
+const GRID_PADDING = 16;
+const GRID_GAP = 8;
+
+interface PickerData {
+  visit: Visit;
+  clientName: string;
+  catalog: Catalog;
+  frontPhotoUrl: string | null;
+}
+
+async function loadPicker(visitId: string): Promise<PickerData> {
+  const [visit, styles, photos] = await Promise.all([getVisit(visitId), listStyles(), listVisitPhotos(visitId)]);
+  const catalog = toCatalog(styles);
+  if (!catalog) throw new Error('the catalog has no keep style');
+  const found = await getClient(visit.clientId);
+  const front = photos.find((photo) => photo.slot === 'front' && photo.uploadStatus === 'uploaded');
+  return { visit, clientName: found.name, catalog, frontPhotoUrl: front?.url ?? null };
+}
+
+// The picker of a visit, after docs/design/picker-references.md: the selected
+// look large on top (the spine's preview, with graft D's header and the
+// floating choose pill), and below it the hair and beard tabs over a grid of
+// tiles that fill in as the visit's previews render.
 export default function PickerScreen() {
+  const router = useRouter();
+  const { id: visitId } = useLocalSearchParams<{ id: string }>();
+  const { width } = useWindowDimensions();
+  const [data, setData] = useState<PickerData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [previews, setPreviews] = useState<VisitPreview[]>([]);
+  const [tab, setTab] = useState<StyleDimension>('hair');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let current = true;
+    loadPicker(visitId).then(
+      (loaded) => {
+        if (!current) return;
+        setData(loaded);
+        // The picker opens on the visit's chosen look, or on keep with keep.
+        const { visit, catalog } = loaded;
+        setSelection({
+          hair: visit.chosenHairStyleId ?? catalog.keep.hair.id,
+          beard: visit.chosenBeardStyleId ?? catalog.keep.beard.id,
+        });
+      },
+      () => current && setFailed(true),
+    );
+    return () => {
+      current = false;
+    };
+  }, [visitId, attempt]);
+
+  useEffect(() => subscribeToPreviews(visitId, setPreviews), [visitId]);
+
+  function reload() {
+    setFailed(false);
+    setAttempt((count) => count + 1);
+  }
+
+  function back() {
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: '/visits/[id]/photos', params: { id: visitId } });
+  }
+
+  function finish() {
+    router.push({ pathname: '/visits/[id]/finish', params: { id: visitId } });
+  }
+
+  async function retry(preview: VisitPreview) {
+    try {
+      const reset = await retryPreview(preview.id);
+      setPreviews((current) =>
+        current.map((row) => (row.id === reset.id ? { ...reset, thumbnailUrl: null, imageUrl: null } : row)),
+      );
+    } catch {
+      // The tile stays failed and can be tapped again.
+    }
+  }
+
+  function press(tile: Tile) {
+    if (tile.status === 'failed' && tile.preview) void retry(tile.preview);
+    else if (selectable(tile)) setSelection((current) => current && { ...current, [tab]: tile.style.id });
+  }
+
+  if (!data || !selection) {
+    return failed ? (
+      <Screen className="items-center justify-center">
+        <Text>{strings.picker.loadFailed}</Text>
+        <Button variant="outline" onPress={reload}>
+          <Text>{strings.picker.retry}</Text>
+        </Button>
+      </Screen>
+    ) : (
+      <Screen className="items-center justify-center">
+        <ActivityIndicator />
+      </Screen>
+    );
+  }
+
+  const { visit, catalog, frontPhotoUrl } = data;
+  const look = lookFor(selection, catalog, previews, frontPhotoUrl);
+  const chosen = visit.chosenHairStyleId === selection.hair && visit.chosenBeardStyleId === selection.beard;
+  const tileWidth = (width - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
+
+  async function choose() {
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      const saved = await chooseLook(visitId, {
+        hairStyleId: selection!.hair,
+        beardStyleId: selection!.beard,
+        previewId: look.previewId,
+      });
+      setData((current) => current && { ...current, visit: saved });
+      finish();
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <Screen className="items-center justify-center">
-      <Text variant="h3">{strings.picker.title}</Text>
-      <Text variant="muted">{strings.picker.comingSoon}</Text>
-    </Screen>
+    <View className="bg-background flex-1">
+      <View className="bg-muted flex-[3] justify-between">
+        {look.imageUrl && (
+          <Image
+            testID="look-image"
+            source={{ uri: look.imageUrl }}
+            resizeMode="cover"
+            className="absolute inset-0"
+          />
+        )}
+        <SafeAreaView edges={['top']} style={HEADER_SCRIM} className="flex-row items-center px-2 pb-6">
+          <Pressable role="button" accessibilityLabel={strings.picker.a11y.back} onPress={back} className="p-2">
+            <Icon as={ArrowLeft} size={24} className="text-white" />
+          </Pressable>
+          <Text numberOfLines={1} className="flex-1 text-center text-base font-semibold text-white">
+            {data.clientName}
+          </Text>
+          <Button variant="link" size="sm" onPress={finish}>
+            <Text className="text-white">{strings.picker.finish}</Text>
+          </Button>
+        </SafeAreaView>
+        <View className="flex-row items-end justify-between gap-3 p-3">
+          <View style={look.ready ? undefined : CAPTION_SCRIM} className="flex-1 rounded-md">
+            {!look.ready && (
+              <View className="flex-row items-center gap-2 p-2">
+                <ActivityIndicator size="small" color="white" />
+                <Text className="text-sm text-white">{strings.picker.tile.generating}</Text>
+              </View>
+            )}
+          </View>
+          <Button className="rounded-full px-6" disabled={!look.ready || chosen || saving} onPress={() => void choose()}>
+            <Text className="font-bold">{chosen ? strings.picker.chosen : strings.picker.choose}</Text>
+          </Button>
+        </View>
+      </View>
+      <View className="flex-[2]">
+        {saveFailed && (
+          <View className="px-4 pt-2">
+            <FormError message={strings.picker.chooseError} />
+          </View>
+        )}
+        <View role="tablist" className="border-border flex-row gap-6 border-b px-4 pt-3">
+          {STYLE_DIMENSIONS.map((dimension) => {
+            const active = dimension === tab;
+            return (
+              <Pressable
+                key={dimension}
+                role="tab"
+                accessibilityLabel={strings.picker.tab[dimension]}
+                accessibilityState={{ selected: active }}
+                onPress={() => setTab(dimension)}
+                className="items-center gap-1.5"
+              >
+                <Text className={cn('text-base', active ? 'text-foreground font-bold' : 'text-muted-foreground')}>
+                  {strings.picker.tab[dimension]}
+                </Text>
+                <View className={cn('h-0.5 w-6 rounded-full', active ? 'bg-foreground' : 'bg-transparent')} />
+              </Pressable>
+            );
+          })}
+        </View>
+        <ScrollView contentContainerStyle={{ padding: GRID_PADDING, gap: GRID_GAP }} contentContainerClassName="flex-row flex-wrap">
+          {tilesFor(tab, catalog, previews, frontPhotoUrl).map((tile) => (
+            <PickerTile
+              key={tile.style.id}
+              tile={tile}
+              width={tileWidth}
+              selected={selection[tab] === tile.style.id}
+              onPress={() => press(tile)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    </View>
   );
 }
