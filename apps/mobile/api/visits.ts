@@ -8,6 +8,7 @@ import {
   type VisitStatus,
 } from '@barber/shared';
 import { supabase } from './supabase';
+import type { QueuedVisit } from './upload-queue';
 
 export interface NewVisit {
   // Generated on the device, so a visit started on bad wifi is one row once online.
@@ -138,9 +139,10 @@ function toVisit(row: VisitRow): Visit {
 }
 
 // Opens a visit for the client, run by the signed-in barber, with consent
-// recorded now. Starting the same id again returns the visit already there,
-// so a retry after a lost response is still one visit.
-export async function startVisit(input: NewVisit): Promise<Visit> {
+// timed when the barber recorded it. Creating the same id again leaves the
+// visit already there, so a resend after a lost response is still one visit.
+// Screens queue it with `startVisit` instead.
+export async function createVisit(visit: QueuedVisit): Promise<void> {
   const [session, shop] = await Promise.all([supabase().auth.getSession(), supabase().rpc('current_shop_id')]);
   if (session.error) throw session.error;
   if (shop.error) throw shop.error;
@@ -151,19 +153,16 @@ export async function startVisit(input: NewVisit): Promise<Visit> {
     .from('visits')
     .upsert(
       {
-        id: input.id,
+        id: visit.id,
         shop_id: shop.data,
-        client_id: input.clientId,
+        client_id: visit.clientId,
         barber_id: barberId,
-        consent_given: input.consentGiven,
-        consent_at: new Date().toISOString(),
+        consent_given: visit.consentGiven,
+        consent_at: visit.consentAt,
       },
       { onConflict: 'id', ignoreDuplicates: true },
     );
   if (error) throw error;
-  const { data, error: readError } = await supabase().from('visits').select('*').eq('id', input.id).single();
-  if (readError) throw readError;
-  return toVisit(data);
 }
 
 export async function getVisit(visitId: string): Promise<Visit> {

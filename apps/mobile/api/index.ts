@@ -5,8 +5,10 @@
 // re-exported: screens import it directly, so screen tests keep it real.
 export * from './auth';
 export * from './clients';
+export { type Connectivity, subscribeToConnectivity } from './connectivity';
 export * from './dashboard';
 export * from './photos';
 export * from './previews';
 export * from './styles';
+export * from './uploads';
 export * from './visits';

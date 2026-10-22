@@ -1,5 +1,6 @@
 import { type PhotoSlot, type Preview, type PreviewRow, STORAGE_BUCKETS } from '@barber/shared';
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
+import { reportLink } from './connectivity';
 import { supabase } from './supabase';
 
 export interface PreviewRequest {
@@ -20,6 +21,10 @@ export type Unsubscribe = () => void;
 
 // While Realtime is down, the picker reads the visit's previews this often.
 export const PREVIEW_POLL_MS = 5000;
+// A channel that errors is subscribed again after this long, doubling up to
+// the ceiling while it keeps failing.
+export const PREVIEW_RESUBSCRIBE_MS = 1000;
+const PREVIEW_RESUBSCRIBE_MAX_MS = 30_000;
 // Long enough for the picker to stay open through a cut.
 const SIGNED_URL_SECONDS = 60 * 60;
 
@@ -35,15 +40,29 @@ export interface PreviewsTransport {
 }
 
 // The visit's previews, read again on every change Realtime reports. While
-// the channel is unhealthy they are polled instead, and a channel that
-// recovers reads once to catch what it missed. Each done row's paths are
-// signed once per subscription.
-export function previewFeed(transport: PreviewsTransport, pollMs = PREVIEW_POLL_MS) {
+// the channel is unhealthy they are polled instead, and the channel is
+// dropped and subscribed again, after a delay that doubles from
+// `resubscribeMs` up to a ceiling, until one reports healthy and reads once
+// to catch what the gap missed. Each done row's paths are signed once per
+// subscription. `onLink` hears every health report.
+export function previewFeed(
+  transport: PreviewsTransport,
+  {
+    pollMs = PREVIEW_POLL_MS,
+    resubscribeMs = PREVIEW_RESUBSCRIBE_MS,
+    onLink,
+  }: { pollMs?: number; resubscribeMs?: number; onLink?: (up: boolean) => void } = {},
+) {
   return function subscribe(visitId: string, onChange: (previews: VisitPreview[]) => void): Unsubscribe {
     const urls = new Map<string, string>();
     let closed = false;
     let poll: ReturnType<typeof setInterval> | null = null;
+    let resubscribe: ReturnType<typeof setTimeout> | null = null;
+    let delay = resubscribeMs;
     let latest = 0;
+    // Each channel's callbacks count only while it is the current one.
+    let channel = 0;
+    let stopListening: Unsubscribe = () => undefined;
 
     async function read() {
       const ticket = ++latest;
@@ -75,24 +94,47 @@ export function previewFeed(transport: PreviewsTransport, pollMs = PREVIEW_POLL_
       poll = null;
     }
 
-    const stopListening = transport.listen(
-      visitId,
-      () => void read(),
-      (healthy) => {
-        if (closed) return;
-        if (healthy) {
-          stopPolling();
-          void read();
-        } else if (!poll) {
-          poll = setInterval(() => void read(), pollMs);
-        }
-      },
-    );
+    function listen() {
+      const mine = ++channel;
+      stopListening = transport.listen(
+        visitId,
+        () => {
+          if (mine === channel) void read();
+        },
+        (healthy) => {
+          if (closed || mine !== channel) return;
+          onLink?.(healthy);
+          if (healthy) {
+            delay = resubscribeMs;
+            stopPolling();
+            void read();
+          } else {
+            lost();
+          }
+        },
+      );
+    }
+
+    function lost() {
+      poll ??= setInterval(() => void read(), pollMs);
+      // Removing the channel reports it closed, which no one hears any more.
+      channel += 1;
+      stopListening();
+      resubscribe = setTimeout(() => {
+        resubscribe = null;
+        if (!closed) listen();
+      }, delay);
+      delay = Math.min(delay * 2, PREVIEW_RESUBSCRIBE_MAX_MS);
+    }
+
+    listen();
     void read();
 
     return () => {
       closed = true;
       stopPolling();
+      if (resubscribe) clearTimeout(resubscribe);
+      channel += 1;
       stopListening();
     };
   };
@@ -125,6 +167,8 @@ const UNHEALTHY_STATES: string[] = [
   REALTIME_SUBSCRIBE_STATES.CLOSED,
 ];
 
+let channels = 0;
+
 const supabaseTransport: PreviewsTransport = {
   async list(visitId) {
     const { data, error } = await supabase().from('previews').select('*').eq('visit_id', visitId);
@@ -145,8 +189,10 @@ const supabaseTransport: PreviewsTransport = {
   },
 
   listen(visitId, onChange, onHealth) {
+    // A fresh topic per listen, so a channel still closing never answers for
+    // the one that replaces it.
     const channel = supabase()
-      .channel(`previews:${visitId}`)
+      .channel(`previews:${visitId}:${++channels}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'previews', filter: `visit_id=eq.${visitId}` },
@@ -160,12 +206,18 @@ const supabaseTransport: PreviewsTransport = {
   },
 };
 
-const subscribeWithSupabase = previewFeed(supabaseTransport);
+const subscribeWithSupabase = previewFeed(supabaseTransport, { onLink: (up) => reportLink('previews', up) });
 
 // Calls `onChange` with every preview of the visit, now and each time one
-// changes, until unsubscribed.
+// changes, until unsubscribed. A dropped connection is subscribed again once
+// it returns, and the previews done meanwhile arrive then.
 export function subscribeToPreviews(visitId: string, onChange: (previews: VisitPreview[]) => void): Unsubscribe {
-  return subscribeWithSupabase(visitId, onChange);
+  const unsubscribe = subscribeWithSupabase(visitId, onChange);
+  return () => {
+    unsubscribe();
+    // A closed picker no longer knows how the channel is.
+    reportLink('previews', true);
+  };
 }
 
 // The visit's preview of the pair on the slot, added at request priority when
