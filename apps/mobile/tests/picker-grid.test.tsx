@@ -1,69 +1,15 @@
-import type { Preview, PreviewStatus, StyleDimension } from '@barber/shared';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
-import type { CatalogStyle, VisitPreview } from '@/api';
+import type { VisitPreview } from '@/api';
 import { strings } from '@/lib/strings';
 import { client, openVisit, uploadedPhoto } from './support/fixtures';
+import { CATALOG, previewOf } from './support/picker';
 
 const FRONT_URL = 'https://storage.test/front.jpg';
 
-function style(dimension: StyleDimension, slug: string, name: string, sortOrder: number): CatalogStyle {
-  const keep = slug === 'keep';
-  return {
-    id: `${dimension}-${slug}`,
-    dimension,
-    slug,
-    name,
-    referenceImagePath: keep ? null : `${dimension}/${slug}.png`,
-    prompt: keep ? null : `give them a ${name}`,
-    sortOrder,
-    active: true,
-    referenceImageUrl: keep ? null : `https://styles.test/${dimension}/${slug}.png`,
-  };
-}
-
-// Out of order on purpose: the grid follows the sort order.
-const CATALOG: CatalogStyle[] = [
-  style('hair', 'quiff', 'Topete', 3),
-  style('hair', 'keep', 'Manter como está', 0),
-  style('hair', 'low-fade', 'Degradê baixo', 1),
-  style('hair', 'buzz-cut', 'Máquina', 2),
-  style('beard', 'keep', 'Manter como está', 0),
-  style('beard', 'stubble', 'Barba por fazer', 1),
-  style('beard', 'goatee', 'Cavanhaque', 2),
-];
 const HAIR_STYLES = ['Degradê baixo', 'Máquina', 'Topete'];
 const BEARD_STYLES = ['Barba por fazer', 'Cavanhaque'];
-
-// A front-photo preview of one style, the other dimension kept, as the
-// subscription delivers it.
-function previewOf(slug: string, status: PreviewStatus, overrides: Partial<Preview> = {}): VisitPreview {
-  const dimension = CATALOG.find((entry) => entry.slug === slug && entry.slug !== 'keep')!.dimension;
-  const id = `pv-${slug}`;
-  const done = status === 'done';
-  return {
-    id,
-    visitId: 'v1',
-    hairStyleId: dimension === 'hair' ? `hair-${slug}` : 'hair-keep',
-    beardStyleId: dimension === 'beard' ? `beard-${slug}` : 'beard-keep',
-    slot: 'front',
-    status,
-    attemptCount: status === 'failed' ? 3 : 0,
-    priority: dimension === 'hair' ? 20 : 10,
-    notBefore: '2026-10-22T14:00:00.000Z',
-    storagePath: done ? `s1/v1/${id}.jpg` : null,
-    thumbnailPath: done ? `s1/v1/${id}.thumb.jpg` : null,
-    error: null,
-    claimedAt: null,
-    completedAt: null,
-    purgedAt: null,
-    createdAt: '2026-10-22T14:00:00.000Z',
-    thumbnailUrl: done ? `https://previews.test/${id}.thumb.jpg` : null,
-    imageUrl: done ? `https://previews.test/${id}.jpg` : null,
-    ...overrides,
-  };
-}
 
 // The scripted subscription: the test emits the visit's previews.
 let emit: (previews: VisitPreview[]) => Promise<void> = async () => undefined;
