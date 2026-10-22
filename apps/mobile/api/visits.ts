@@ -16,10 +16,13 @@ export interface NewVisit {
   consentGiven: true;
 }
 
+// The hair and beard styles the client chose, keep included, and the preview
+// they were chosen from: null for hair keep with beard keep, whose image is
+// the front photo itself.
 export interface Look {
   hairStyleId: string;
   beardStyleId: string;
-  previewId: string;
+  previewId: string | null;
 }
 
 // A visit as home and the client screen list it: who, by whom, when, and
@@ -163,8 +166,26 @@ export async function startVisit(input: NewVisit): Promise<Visit> {
   return toVisit(data);
 }
 
+export async function getVisit(visitId: string): Promise<Visit> {
+  const { data, error } = await supabase().from('visits').select('*').eq('id', visitId).single();
+  if (error) throw error;
+  return toVisit(data);
+}
+
+// Records the look on the visit, replacing one chosen before.
 export async function chooseLook(visitId: string, look: Look): Promise<Visit> {
-  return notImplemented('chooseLook');
+  const { data, error } = await supabase()
+    .from('visits')
+    .update({
+      chosen_hair_style_id: look.hairStyleId,
+      chosen_beard_style_id: look.beardStyleId,
+      chosen_preview_id: look.previewId,
+    })
+    .eq('id', visitId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return toVisit(data);
 }
 
 export async function closeVisit(visitId: string): Promise<Visit> {
