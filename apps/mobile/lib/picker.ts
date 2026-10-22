@@ -1,7 +1,7 @@
 // What the picker shows, derived from the catalog and the visit's previews.
 // Pure, with no network, so the screen stays a layout over it.
-import { KEEP_STYLE_SLUG, type StyleDimension } from '@barber/shared';
-import type { CatalogStyle, VisitPreview } from '@/api';
+import { KEEP_STYLE_SLUG, type PhotoSlot, type StyleDimension } from '@barber/shared';
+import type { CatalogStyle, PreviewRequest, VisitPreview } from '@/api';
 
 // A pre-rendered preview fills in until it is done; keep never renders.
 export type TileStatus = 'keep' | 'generating' | 'done' | 'failed' | 'refused';
@@ -37,16 +37,17 @@ export function toCatalog(styles: CatalogStyle[]): Catalog | null {
   return { hair: hair.styles, beard: beard.styles, keep: { hair: hair.keep, beard: beard.keep } };
 }
 
-// The front-photo preview of a pair of styles, if the visit has one.
+// The visit's preview of a pair of styles on one slot, if it has one.
 export function previewFor(
   previews: VisitPreview[],
   hairStyleId: string,
   beardStyleId: string,
+  slot: PhotoSlot = 'front',
 ): VisitPreview | null {
   return (
     previews.find(
       (preview) =>
-        preview.slot === 'front' && preview.hairStyleId === hairStyleId && preview.beardStyleId === beardStyleId,
+        preview.slot === slot && preview.hairStyleId === hairStyleId && preview.beardStyleId === beardStyleId,
     ) ?? null
   );
 }
@@ -75,35 +76,76 @@ export function tilesFor(
   });
 }
 
-// What the large preview shows for the selected pair, and what choosing it
-// records. Hair keep with beard keep is the front photo, with no preview.
-// Otherwise it is the selected hair's preview, or the beard's when hair is
-// kept; a hair and a beard together show the hair until combinations render.
+// The selected pair on one slot, as the large preview and the full-screen
+// pages show it, and what choosing it records. Hair keep with beard keep is
+// the slot's photo, with no preview. A single style on the front photo is
+// pre-rendered; a hair and a beard together, or any style on another slot,
+// renders on demand. Until the look is done, a combination shows its hair
+// preview underneath, and anything else shows the style's reference image on
+// the front and the slot's photo elsewhere.
+export type LookStatus = 'done' | 'generating' | 'combining' | 'failed' | 'refused';
+
+export type PairRequest = Omit<PreviewRequest, 'visitId'>;
+
 export interface LookPreview {
+  slot: PhotoSlot;
+  status: LookStatus;
+  combination: boolean;
   imageUrl: string | null;
-  ready: boolean;
+  // What choosing records: the done preview, or null for keep with keep.
   previewId: string | null;
+  // The row the look waits on, once it exists.
+  preview: VisitPreview | null;
+  // The pair to ask the database for while its row is missing.
+  request: PairRequest | null;
 }
 
 export function lookFor(
   selection: Selection,
   catalog: Catalog,
   previews: VisitPreview[],
-  frontPhotoUrl: string | null,
+  slot: PhotoSlot,
+  photoUrl: string | null,
 ): LookPreview {
   const hairKept = selection.hair === catalog.keep.hair.id;
   const beardKept = selection.beard === catalog.keep.beard.id;
-  if (hairKept && beardKept) return { imageUrl: frontPhotoUrl, ready: true, previewId: null };
+  const combination = !hairKept && !beardKept;
+  const look = { slot, combination, preview: null, request: null };
+  if (hairKept && beardKept) return { ...look, status: 'done', imageUrl: photoUrl, previewId: null };
 
-  const dimension: StyleDimension = hairKept ? 'beard' : 'hair';
-  const tile = tilesFor(dimension, catalog, previews, frontPhotoUrl).find(
-    (candidate) => candidate.style.id === selection[dimension],
-  );
-  if (!tile) return { imageUrl: null, ready: false, previewId: null };
-  if (tile.status === 'done' && tile.preview) {
-    return { imageUrl: tile.preview.imageUrl ?? tile.imageUrl, ready: true, previewId: tile.preview.id };
+  const preview = previewFor(previews, selection.hair, selection.beard, slot);
+  if (preview?.status === 'done') {
+    return {
+      ...look,
+      status: 'done',
+      imageUrl: preview.imageUrl ?? preview.thumbnailUrl,
+      previewId: preview.id,
+      preview,
+    };
   }
-  return { imageUrl: tile.style.referenceImageUrl, ready: false, previewId: null };
+
+  const ended = preview?.status === 'failed' || preview?.status === 'refused' ? preview.status : null;
+  const shown: StyleDimension = hairKept ? 'beard' : 'hair';
+  const reference = catalog[shown].find((style) => style.id === selection[shown])?.referenceImageUrl ?? null;
+  let imageUrl = slot === 'front' ? reference : photoUrl;
+  if (combination) {
+    const base = previewFor(previews, selection.hair, catalog.keep.beard.id, slot);
+    if (base?.status === 'done') imageUrl = base.imageUrl ?? base.thumbnailUrl;
+  }
+  const onDemand = combination || slot !== 'front';
+  return {
+    ...look,
+    status: ended ?? (combination ? 'combining' : 'generating'),
+    imageUrl,
+    previewId: null,
+    preview,
+    request: onDemand && !preview ? { hairStyleId: selection.hair, beardStyleId: selection.beard, slot } : null,
+  };
+}
+
+// One key per pair and slot.
+export function requestKey(request: PairRequest): string {
+  return `${request.hairStyleId}|${request.beardStyleId}|${request.slot}`;
 }
 
 // Whether a tap on the tile selects it: a failed tile retries instead, and a
