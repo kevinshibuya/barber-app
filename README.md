@@ -11,7 +11,7 @@ Building M1 of spec #1. No name is chosen; the app's display name is a working t
 A pnpm monorepo:
 
 - `apps/mobile` (`@barber/mobile`): the barbers' app. Expo, TypeScript, expo-router, NativeWind with react-native-reusables for primitives. Every user-facing string lives in `lib/strings.ts`, in Brazilian Portuguese. Every Supabase call lives in `api/`; a lint rule rejects a Supabase import anywhere else. Tests in `tests/` (jest-expo, React Native Testing Library) get the `api` module as a Jest mock.
-- `apps/worker` (`@barber/worker`): the preview worker and the client page. NestJS, TypeScript. Tests in `test/` (jest, supertest).
+- `apps/worker` (`@barber/worker`): the preview worker, the nightly cleanup and the client page. NestJS, TypeScript. Tests in `test/` (jest, supertest). The cleanup runs at 03:00 São Paulo time; `pnpm --filter @barber/worker run cleanup` runs it once by hand.
 - `packages/shared` (`@barber/shared`): types and constants both apps use, including every environment variable name. Tests in `tests/`.
 - `supabase/`: the Supabase CLI project (config and migrations), at the root rather than inside a package.
 
