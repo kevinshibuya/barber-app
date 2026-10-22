@@ -1,4 +1,5 @@
 import {
+  afterPhotoPath,
   originalPhotoPath,
   PHOTO_SLOTS,
   type Photo,
@@ -7,8 +8,8 @@ import {
   type Visit,
 } from '@barber/shared';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { notImplemented } from './not-implemented';
 import { supabase } from './supabase';
+import { getVisit } from './visits';
 
 // Photos leave the device at most this long on their long edge, as JPEG, so
 // shop wifi carries a few hundred kilobytes per slot.
@@ -196,6 +197,41 @@ export async function listVisitPhotos(visitId: string): Promise<VisitPhoto[]> {
   return photos.map((photo) => ({ ...photo, url: urls.get(photo.storagePath) ?? null }));
 }
 
-export async function uploadAfterPhoto(visitId: string, uri: string): Promise<Visit> {
-  return notImplemented('uploadAfterPhoto');
+// Everything an after photo upload sends over the network.
+export interface AfterPhotoTransport extends Pick<PhotoTransport, 'putOriginal'> {
+  visitOf(visitId: string): Promise<Visit>;
+  // Points the visit at the object, which locks its look.
+  recordAfterPhoto(visitId: string, path: string): Promise<Visit>;
+}
+
+// Uploads the visit's after photo, downscaled like the slots, to the visit's
+// after path, and records the path on the visit once the object is there. A
+// retake replaces the object in place. Rejects with the visit unchanged when
+// the upload fails.
+export function afterPhotoUploader(transport: AfterPhotoTransport, images: ImageTool) {
+  return async function upload(visitId: string, shot: LocalImage): Promise<Visit> {
+    const [visit, image] = await Promise.all([
+      transport.visitOf(visitId),
+      images.toJpeg(shot, fittedSize(shot.width, shot.height)),
+    ]);
+    const path = afterPhotoPath(visit.shopId, visitId);
+    await transport.putOriginal(path, image);
+    return transport.recordAfterPhoto(visitId, path);
+  };
+}
+
+const afterPhotoTransport: AfterPhotoTransport = {
+  visitOf: getVisit,
+  putOriginal: supabaseTransport.putOriginal,
+  async recordAfterPhoto(visitId, path) {
+    const { error } = await supabase().from('visits').update({ after_photo_path: path }).eq('id', visitId);
+    if (error) throw error;
+    return getVisit(visitId);
+  },
+};
+
+const uploadAfterWithSupabase = afterPhotoUploader(afterPhotoTransport, deviceImages);
+
+export async function uploadAfterPhoto(visitId: string, shot: LocalImage): Promise<Visit> {
+  return uploadAfterWithSupabase(visitId, shot);
 }

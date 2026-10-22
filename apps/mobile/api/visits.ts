@@ -1,4 +1,5 @@
 import {
+  previewImagePath,
   previewThumbnailPath,
   STORAGE_BUCKETS,
   type StorageBucket,
@@ -6,7 +7,6 @@ import {
   type Visit,
   type VisitStatus,
 } from '@barber/shared';
-import { notImplemented } from './not-implemented';
 import { supabase } from './supabase';
 
 export interface NewVisit {
@@ -188,6 +188,54 @@ export async function chooseLook(visitId: string, look: Look): Promise<Visit> {
   return toVisit(data);
 }
 
+// A visit as the finish screen shows it, with signed URLs of the chosen
+// look's image (the front photo for keep with keep, null before a choice)
+// and of the after photo.
+export interface VisitDetail {
+  visit: Visit;
+  lookImageUrl: string | null;
+  afterPhotoUrl: string | null;
+}
+
+// The chosen look's object: the preview's image, or the front photo for keep
+// with keep. A chosen preview is never purged, so its image sits at the fixed path.
+async function lookObject(visit: Visit): Promise<{ bucket: StorageBucket; path: string } | null> {
+  if (visit.chosenPreviewId) {
+    return { bucket: STORAGE_BUCKETS.previews, path: previewImagePath(visit.shopId, visit.id, visit.chosenPreviewId) };
+  }
+  if (!visit.chosenHairStyleId || !visit.chosenBeardStyleId) return null;
+  const { data, error } = await supabase()
+    .from('photos')
+    .select('storage_path')
+    .eq('visit_id', visit.id)
+    .eq('slot', 'front')
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { bucket: STORAGE_BUCKETS.originals, path: data.storage_path } : null;
+}
+
+export async function getVisitDetail(visitId: string): Promise<VisitDetail> {
+  const visit = await getVisit(visitId);
+  const look = await lookObject(visit);
+  const [looks, afters] = await Promise.all([
+    look ? signPaths(look.bucket, [look.path]) : new Map<string, string>(),
+    signPaths(STORAGE_BUCKETS.originals, visit.afterPhotoPath ? [visit.afterPhotoPath] : []),
+  ]);
+  return {
+    visit,
+    lookImageUrl: look ? (looks.get(look.path) ?? null) : null,
+    afterPhotoUrl: visit.afterPhotoPath ? (afters.get(visit.afterPhotoPath) ?? null) : null,
+  };
+}
+
+// Closes the visit now, with or without an after photo.
 export async function closeVisit(visitId: string): Promise<Visit> {
-  return notImplemented('closeVisit');
+  const { data, error } = await supabase()
+    .from('visits')
+    .update({ status: 'closed', closed_at: new Date().toISOString() })
+    .eq('id', visitId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return toVisit(data);
 }
