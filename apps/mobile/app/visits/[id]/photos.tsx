@@ -1,19 +1,22 @@
+import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { FormError } from '@/components/form-error';
 import { PhotoSlotRow } from '@/components/photo-slot-row';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type LocalImage, listVisitPhotos, uploadPhoto } from '@/api';
+import { type LocalImage, listVisitPhotos, subscribeToUploads, uploadPhoto } from '@/api';
 import { canContinue, emptySlots, photoSlotsReducer, REQUIRED_SLOT } from '@/api/slots';
 import { type PhotoSource, pickPhoto } from '@/lib/pick-photo';
 import { strings } from '@/lib/strings';
 import { PHOTO_SLOTS, type PhotoSlot } from '@barber/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useReducer, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
-// The four slots of a visit. A slot uploads the moment it is filled; a
-// resumed visit shows the photos it already has.
+// The four slots of a visit. A slot uploads the moment it is filled, through
+// the upload queue, which retries on bad wifi and after the app closes; a
+// queued slot waits for the connection rather than failing. A resumed visit
+// shows the photos it already has.
 export default function PhotosScreen() {
   const router = useRouter();
   const { id: visitId } = useLocalSearchParams<{ id: string }>();
@@ -32,11 +35,12 @@ export default function PhotosScreen() {
     };
   }, [visitId]);
 
+  useEffect(() => subscribeToUploads(visitId, (uploads) => dispatch({ type: 'queue', uploads })), [visitId]);
+
   async function upload(slot: PhotoSlot, image: LocalImage) {
     dispatch({ type: 'started', slot, image });
     try {
       await uploadPhoto({ visitId, slot, ...image });
-      dispatch({ type: 'uploaded', slot });
     } catch {
       dispatch({ type: 'failed', slot });
     }
@@ -55,7 +59,10 @@ export default function PhotosScreen() {
 
   return (
     <Screen className="pb-0">
-      <Text variant="h3">{strings.photos.title}</Text>
+      <View className="flex-row items-center justify-between gap-2">
+        <Text variant="h3">{strings.photos.title}</Text>
+        <ConnectivityIndicator />
+      </View>
       <FormError message={cameraDenied ? strings.photos.cameraDenied : null} />
       <ScrollView contentContainerClassName="gap-2 pb-4">
         {PHOTO_SLOTS.map((slot) => (

@@ -3,8 +3,12 @@
 // it real while the rest of the `api` module is mocked.
 import { PHOTO_SLOTS, type PhotoSlot } from '@barber/shared';
 import type { LocalImage, VisitPhoto } from './photos';
+import type { DeliveryStatus } from './upload-queue';
+import type { SlotUploads } from './uploads';
 
-export type SlotStatus = 'empty' | 'uploading' | 'uploaded' | 'failed';
+// Waiting: the shot is queued on the device and goes up when the network
+// lets it. Failed: the shot could not even be queued.
+export type SlotStatus = 'empty' | 'uploading' | 'waiting' | 'uploaded' | 'failed';
 
 export interface SlotState {
   status: SlotStatus;
@@ -21,7 +25,7 @@ export const REQUIRED_SLOT: PhotoSlot = 'front';
 export type SlotEvent =
   | { type: 'loaded'; photos: VisitPhoto[] }
   | { type: 'started'; slot: PhotoSlot; image: LocalImage }
-  | { type: 'uploaded'; slot: PhotoSlot }
+  | { type: 'queue'; uploads: SlotUploads }
   | { type: 'failed'; slot: PhotoSlot };
 
 export function emptySlots(): PhotoSlots {
@@ -44,15 +48,33 @@ function loaded(slots: PhotoSlots, photos: VisitPhoto[]): PhotoSlots {
   return next;
 }
 
+const QUEUED_STATUS: Record<DeliveryStatus, SlotStatus> = {
+  sending: 'uploading',
+  waiting: 'waiting',
+  sent: 'uploaded',
+};
+
+// The upload queue speaks for every slot it has a shot of, including one a
+// closed app left queued.
+function queued(slots: PhotoSlots, uploads: SlotUploads): PhotoSlots {
+  const next = { ...slots };
+  for (const slot of PHOTO_SLOTS) {
+    const upload = uploads[slot];
+    if (upload) next[slot] = { status: QUEUED_STATUS[upload.status], image: upload.image };
+  }
+  return next;
+}
+
 export function photoSlotsReducer(slots: PhotoSlots, event: SlotEvent): PhotoSlots {
   switch (event.type) {
     case 'loaded':
       return loaded(slots, event.photos);
     case 'started':
       return { ...slots, [event.slot]: { status: 'uploading', image: event.image } };
-    case 'uploaded':
+    case 'queue':
+      return queued(slots, event.uploads);
     case 'failed':
-      return { ...slots, [event.slot]: { ...slots[event.slot], status: event.type } };
+      return { ...slots, [event.slot]: { ...slots[event.slot], status: 'failed' } };
   }
 }
 

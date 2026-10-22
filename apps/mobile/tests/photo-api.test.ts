@@ -144,6 +144,31 @@ describe('photo upload', () => {
     expect([...network.objects.keys()]).toEqual([retake.storagePath]);
     expect(network.rows.get('v1/front')).toMatchObject({ storagePath: retake.storagePath, uploadStatus: 'uploaded' });
   });
+
+  it('writes a take to its own path once, however often it is sent', async () => {
+    const network = fakeNetwork();
+    const upload = photoUploader(network.transport, fakeImages());
+
+    await upload(shot(), 'take1');
+    // The response was lost and the queue sends the same take again.
+    const again = await upload(shot(), 'take1');
+
+    expect(again).toMatchObject({ storagePath: 's1/v1/front.take1.jpg', uploadStatus: 'uploaded' });
+    expect(network.statuses).toEqual(['uploading', 'uploaded']);
+    expect([...network.objects.keys()]).toEqual(['s1/v1/front.take1.jpg']);
+  });
+
+  it('puts a new take in place of an earlier one the network never finished', async () => {
+    const network = fakeNetwork();
+    const upload = photoUploader(network.transport, fakeImages());
+    network.failNextPut();
+    await expect(upload(shot(), 'take1')).rejects.toThrow('network down');
+
+    await upload(shot({ uri: 'file:///camera/retake.heic' }), 'take2');
+
+    expect(network.rows.get('v1/front')).toMatchObject({ storagePath: 's1/v1/front.take2.jpg', uploadStatus: 'uploaded' });
+    expect([...network.objects.keys()]).toEqual(['s1/v1/front.take2.jpg']);
+  });
 });
 
 // One visit of shop s1 and the originals bucket. The visit records an after
