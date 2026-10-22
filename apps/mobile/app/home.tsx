@@ -3,7 +3,7 @@ import { VisitRow } from '@/components/visit-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type VisitSummary, listRecentVisits, searchClients, signOut } from '@/api';
+import { type VisitSummary, listOpenVisitsToday, listRecentVisits, searchClients, signOut } from '@/api';
 import { strings } from '@/lib/strings';
 import type { Client } from '@barber/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -42,14 +42,19 @@ function useClientSearch(query: string) {
   };
 }
 
-function useRecentVisits() {
+// Today's open visits, to resume, and the shop's recent visits without them.
+function useHomeVisits() {
   const [visits, setVisits] = useState<VisitSummary[] | null>(null);
+  const [openToday, setOpenToday] = useState<VisitSummary[]>([]);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setVisits(await listRecentVisits());
+      const [recent, open] = await Promise.all([listRecentVisits(), listOpenVisitsToday()]);
+      const openIds = new Set(open.map((visit) => visit.id));
+      setOpenToday(open);
+      setVisits(recent.filter((visit) => !openIds.has(visit.id)));
       setFailed(false);
     } catch {
       setFailed(true);
@@ -69,14 +74,14 @@ function useRecentVisits() {
     setRefreshing(false);
   }, [load]);
 
-  return { visits, failed, refreshing, refresh };
+  return { visits, openToday, failed, refreshing, refresh };
 }
 
 export default function HomeScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const search = useClientSearch(query);
-  const recent = useRecentVisits();
+  const recent = useHomeVisits();
 
   async function leave() {
     await signOut().catch(() => undefined);
@@ -126,11 +131,26 @@ export default function HomeScreen() {
           keyExtractor={(visit) => visit.id}
           refreshControl={<RefreshControl refreshing={recent.refreshing} onRefresh={recent.refresh} />}
           ListHeaderComponent={
-            <View className="flex-row items-center justify-between pb-2">
+            <View className="gap-2 pb-2">
+              <View className="flex-row items-center justify-end">
+                <Button variant="ghost" size="sm" onPress={leave}>
+                  <Text>{strings.home.signOut}</Text>
+                </Button>
+              </View>
+              {recent.openToday.length > 0 && (
+                <View>
+                  <Text variant="large">{strings.home.openToday}</Text>
+                  {recent.openToday.map((visit) => (
+                    <VisitRow
+                      key={visit.id}
+                      visit={visit}
+                      showClient
+                      onPress={() => router.push({ pathname: '/visits/[id]/photos', params: { id: visit.id } })}
+                    />
+                  ))}
+                </View>
+              )}
               <Text variant="large">{strings.home.recentVisits}</Text>
-              <Button variant="ghost" size="sm" onPress={leave}>
-                <Text>{strings.home.signOut}</Text>
-              </Button>
             </View>
           }
           renderItem={({ item }) => (

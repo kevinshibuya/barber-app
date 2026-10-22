@@ -17,3 +17,6 @@ beforeEach(() => {
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+// expo-crypto is native; Node's Web Crypto makes the same v4 UUIDs.
+jest.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }));

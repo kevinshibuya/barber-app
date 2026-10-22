@@ -2,6 +2,7 @@ import {
   previewThumbnailPath,
   STORAGE_BUCKETS,
   type StorageBucket,
+  type Tables,
   type Visit,
   type VisitStatus,
 } from '@barber/shared';
@@ -110,8 +111,56 @@ export async function listClientVisits(clientId: string): Promise<VisitSummary[]
   return toSummaries(data);
 }
 
+type VisitRow = Tables<'visits'>;
+
+function toVisit(row: VisitRow): Visit {
+  return {
+    id: row.id,
+    shopId: row.shop_id,
+    clientId: row.client_id,
+    barberId: row.barber_id,
+    consentGiven: row.consent_given,
+    consentAt: row.consent_at,
+    status: row.status,
+    chosenHairStyleId: row.chosen_hair_style_id,
+    chosenBeardStyleId: row.chosen_beard_style_id,
+    chosenPreviewId: row.chosen_preview_id,
+    afterPhotoPath: row.after_photo_path,
+    shareToken: row.share_token,
+    shareExpiresAt: row.share_expires_at,
+    providerName: row.provider_name,
+    createdAt: row.created_at,
+    closedAt: row.closed_at,
+  };
+}
+
+// Opens a visit for the client, run by the signed-in barber, with consent
+// recorded now. Starting the same id again returns the visit already there,
+// so a retry after a lost response is still one visit.
 export async function startVisit(input: NewVisit): Promise<Visit> {
-  return notImplemented('startVisit');
+  const [session, shop] = await Promise.all([supabase().auth.getSession(), supabase().rpc('current_shop_id')]);
+  if (session.error) throw session.error;
+  if (shop.error) throw shop.error;
+  const barberId = session.data.session?.user.id;
+  if (!barberId || !shop.data) throw new Error('the signed-in user is not a barber of any shop');
+
+  const { error } = await supabase()
+    .from('visits')
+    .upsert(
+      {
+        id: input.id,
+        shop_id: shop.data,
+        client_id: input.clientId,
+        barber_id: barberId,
+        consent_given: input.consentGiven,
+        consent_at: new Date().toISOString(),
+      },
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+  if (error) throw error;
+  const { data, error: readError } = await supabase().from('visits').select('*').eq('id', input.id).single();
+  if (readError) throw readError;
+  return toVisit(data);
 }
 
 export async function chooseLook(visitId: string, look: Look): Promise<Visit> {

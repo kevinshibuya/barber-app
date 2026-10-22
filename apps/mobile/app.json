@@ -34,7 +34,15 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O Barber usa a câmera para fotografar o cliente e gerar as prévias de corte.",
+          "photosPermission": "O Barber usa suas fotos para escolher uma foto do cliente e gerar as prévias de corte.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

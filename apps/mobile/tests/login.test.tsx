@@ -6,6 +6,7 @@ import { rafa } from './support/fixtures';
 
 beforeEach(() => {
   jest.mocked(api.listRecentVisits).mockResolvedValue([]);
+  jest.mocked(api.listOpenVisitsToday).mockResolvedValue([]);
 });
 
 async function signInWith(email: string, password: string) {
