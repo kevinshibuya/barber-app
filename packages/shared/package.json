@@ -15,9 +15,12 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest",
+    "provision": "ts-node --transpile-only scripts/provision.ts",
+    "db:types": "cd ../.. && supabase gen types typescript --local --schema public > packages/shared/src/database.ts"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.5",
     "eslint": "^9.39.0",
