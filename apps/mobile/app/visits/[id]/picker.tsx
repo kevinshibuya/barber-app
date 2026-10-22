@@ -1,5 +1,7 @@
 import { FormError } from '@/components/form-error';
-import { CAPTION_SCRIM, PickerTile } from '@/components/picker-tile';
+import { FullScreenPreview } from '@/components/full-screen-preview';
+import { ChoosePill, LookStatus } from '@/components/look-status';
+import { PickerTile } from '@/components/picker-tile';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
@@ -10,17 +12,29 @@ import {
   getVisit,
   listStyles,
   listVisitPhotos,
+  requestPreview,
   retryPreview,
   subscribeToPreviews,
   type VisitPreview,
 } from '@/api';
-import { type Catalog, lookFor, type Selection, selectable, type Tile, tilesFor, toCatalog } from '@/lib/picker';
+import {
+  type Catalog,
+  type LookPreview,
+  lookFor,
+  type PairRequest,
+  requestKey,
+  type Selection,
+  selectable,
+  type Tile,
+  tilesFor,
+  toCatalog,
+} from '@/lib/picker';
 import { strings } from '@/lib/strings';
 import { cn } from '@/lib/utils';
-import { STYLE_DIMENSIONS, type StyleDimension, type Visit } from '@barber/shared';
+import { type PhotoSlot, STYLE_DIMENSIONS, type StyleDimension, type Visit } from '@barber/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +48,8 @@ interface PickerData {
   clientName: string;
   catalog: Catalog;
   frontPhotoUrl: string | null;
+  // The uploaded photos in slot order: the full-screen preview's pages.
+  angles: { slot: PhotoSlot; url: string | null }[];
 }
 
 async function loadPicker(visitId: string): Promise<PickerData> {
@@ -41,14 +57,19 @@ async function loadPicker(visitId: string): Promise<PickerData> {
   const catalog = toCatalog(styles);
   if (!catalog) throw new Error('the catalog has no keep style');
   const found = await getClient(visit.clientId);
-  const front = photos.find((photo) => photo.slot === 'front' && photo.uploadStatus === 'uploaded');
-  return { visit, clientName: found.name, catalog, frontPhotoUrl: front?.url ?? null };
+  const angles = photos
+    .filter((photo) => photo.uploadStatus === 'uploaded')
+    .map((photo) => ({ slot: photo.slot, url: photo.url }));
+  const front = angles.find((angle) => angle.slot === 'front');
+  return { visit, clientName: found.name, catalog, frontPhotoUrl: front?.url ?? null, angles };
 }
 
 // The picker of a visit, after docs/design/picker-references.md: the selected
 // look large on top (the spine's preview, with graft D's header and the
 // floating choose pill), and below it the hair and beard tabs over a grid of
-// tiles that fill in as the visit's previews render.
+// tiles that fill in as the visit's previews render. Tapping the look opens
+// it full screen, across the visit's other angles. Combinations and other
+// angles render on demand, requested the first time they are shown.
 export default function PickerScreen() {
   const router = useRouter();
   const { id: visitId } = useLocalSearchParams<{ id: string }>();
@@ -61,6 +82,11 @@ export default function PickerScreen() {
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
+  const [page, setPage] = useState(0);
+  // Requests sent this visit, and those that failed before a row existed.
+  const requested = useRef(new Set<string>());
+  const [unrequested, setUnrequested] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let current = true;
@@ -83,6 +109,49 @@ export default function PickerScreen() {
   }, [visitId, attempt]);
 
   useEffect(() => subscribeToPreviews(visitId, setPreviews), [visitId]);
+
+  // The look on the front, which the picker shows, and on every angle, which
+  // the full-screen pages show.
+  const front =
+    data && selection
+      ? settle(lookFor(selection, data.catalog, previews, 'front', data.frontPhotoUrl), unrequested)
+      : null;
+  const looks =
+    data && selection
+      ? data.angles.map((angle) =>
+          settle(lookFor(selection, data.catalog, previews, angle.slot, angle.url), unrequested),
+        )
+      : [];
+  const shown = [front, fullScreen ? looks[page] : null];
+
+  // Asks once for each on-demand look shown without a row; a retry asks again.
+  useEffect(() => {
+    for (const look of shown) {
+      if (look?.request && !requested.current.has(requestKey(look.request))) void request(look.request);
+    }
+  });
+
+  async function request(pair: PairRequest) {
+    const key = requestKey(pair);
+    requested.current.add(key);
+    setUnrequested((current) => without(current, key));
+    try {
+      const row = await requestPreview({ visitId, ...pair });
+      if (!row) return;
+      setPreviews((current) =>
+        current.some((preview) => preview.id === row.id)
+          ? current
+          : [...current, { ...row, thumbnailUrl: null, imageUrl: null }],
+      );
+    } catch {
+      setUnrequested((current) => new Set(current).add(key));
+    }
+  }
+
+  function retryLook(look: LookPreview) {
+    if (look.preview) void retry(look.preview);
+    else if (look.request) void request(look.request);
+  }
 
   function reload() {
     setFailed(false);
@@ -130,39 +199,68 @@ export default function PickerScreen() {
   }
 
   const { visit, catalog, frontPhotoUrl } = data;
-  const look = lookFor(selection, catalog, previews, frontPhotoUrl);
+  const look = front!;
   const chosen = visit.chosenHairStyleId === selection.hair && visit.chosenBeardStyleId === selection.beard;
   const tileWidth = (width - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
 
-  async function choose() {
+  async function choose(chosenLook: LookPreview) {
     setSaving(true);
     setSaveFailed(false);
     try {
       const saved = await chooseLook(visitId, {
         hairStyleId: selection!.hair,
         beardStyleId: selection!.beard,
-        previewId: look.previewId,
+        previewId: chosenLook.previewId,
       });
       setData((current) => current && { ...current, visit: saved });
+      setFullScreen(false);
       finish();
     } catch {
+      setFullScreen(false);
       setSaveFailed(true);
     } finally {
       setSaving(false);
     }
   }
 
+  function openFullScreen() {
+    setPage(0);
+    setFullScreen(true);
+  }
+
+  const pill = (shownLook: LookPreview) => (
+    <ChoosePill look={shownLook} chosen={chosen} saving={saving} onChoose={(picked) => void choose(picked)} />
+  );
+
   return (
     <View className="bg-background flex-1">
+      {fullScreen && (
+        <FullScreenPreview
+          looks={looks}
+          page={page}
+          onPage={setPage}
+          onClose={() => setFullScreen(false)}
+          onRetry={retryLook}
+          choose={pill}
+        />
+      )}
       <View className="bg-muted flex-[3] justify-between">
-        {look.imageUrl && (
-          <Image
-            testID="look-image"
-            source={{ uri: look.imageUrl }}
-            resizeMode="cover"
-            className="absolute inset-0"
-          />
-        )}
+        <Pressable
+          role="button"
+          accessibilityLabel={strings.picker.a11y.openPreview}
+          disabled={looks.length === 0}
+          onPress={openFullScreen}
+          className="absolute inset-0"
+        >
+          {look.imageUrl && (
+            <Image
+              testID="look-image"
+              source={{ uri: look.imageUrl }}
+              resizeMode="cover"
+              className="absolute inset-0"
+            />
+          )}
+        </Pressable>
         <SafeAreaView edges={['top']} style={HEADER_SCRIM} className="flex-row items-center px-2 pb-6">
           <Pressable role="button" accessibilityLabel={strings.picker.a11y.back} onPress={back} className="p-2">
             <Icon as={ArrowLeft} size={24} className="text-white" />
@@ -175,17 +273,10 @@ export default function PickerScreen() {
           </Button>
         </SafeAreaView>
         <View className="flex-row items-end justify-between gap-3 p-3">
-          <View style={look.ready ? undefined : CAPTION_SCRIM} className="flex-1 rounded-md">
-            {!look.ready && (
-              <View className="flex-row items-center gap-2 p-2">
-                <ActivityIndicator size="small" color="white" />
-                <Text className="text-sm text-white">{strings.picker.tile.generating}</Text>
-              </View>
-            )}
+          <View className="flex-1 items-start">
+            <LookStatus look={look} onRetry={retryLook} />
           </View>
-          <Button className="rounded-full px-6" disabled={!look.ready || chosen || saving} onPress={() => void choose()}>
-            <Text className="font-bold">{chosen ? strings.picker.chosen : strings.picker.choose}</Text>
-          </Button>
+          {pill(look)}
         </View>
       </View>
       <View className="flex-[2]">
@@ -228,4 +319,17 @@ export default function PickerScreen() {
       </View>
     </View>
   );
+}
+
+function without(keys: ReadonlySet<string>, key: string): ReadonlySet<string> {
+  if (!keys.has(key)) return keys;
+  const rest = new Set(keys);
+  rest.delete(key);
+  return rest;
+}
+
+// A look whose request failed before its row existed reads as failed, so a
+// tap asks again.
+function settle(look: LookPreview, unrequested: ReadonlySet<string>): LookPreview {
+  return look.request && unrequested.has(requestKey(look.request)) ? { ...look, status: 'failed' } : look;
 }

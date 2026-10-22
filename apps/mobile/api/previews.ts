@@ -1,6 +1,5 @@
 import { type PhotoSlot, type Preview, type PreviewRow, STORAGE_BUCKETS } from '@barber/shared';
 import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
-import { notImplemented } from './not-implemented';
 import { supabase } from './supabase';
 
 export interface PreviewRequest {
@@ -169,8 +168,20 @@ export function subscribeToPreviews(visitId: string, onChange: (previews: VisitP
   return subscribeWithSupabase(visitId, onChange);
 }
 
-export async function requestPreview(request: PreviewRequest): Promise<Preview> {
-  return notImplemented('requestPreview');
+// The visit's preview of the pair on the slot, added at request priority when
+// missing; a repeat request returns the same row. Keep with keep renders
+// nothing and comes back null.
+export async function requestPreview(request: PreviewRequest): Promise<Preview | null> {
+  const { data, error } = await supabase()
+    .rpc('request_preview', {
+      visit_id: request.visitId,
+      hair_style_id: request.hairStyleId,
+      beard_style_id: request.beardStyleId,
+      slot: request.slot,
+    })
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toPreview(data) : null;
 }
 
 // Resets a failed preview to pending; any other preview comes back as it is.
