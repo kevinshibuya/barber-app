@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "test": "jest",
     "provision": "ts-node --transpile-only scripts/provision.ts",
+    "upload-styles": "ts-node --transpile-only scripts/upload-styles.ts",
     "db:types": "cd ../.. && supabase gen types typescript --local --schema public > packages/shared/src/database.ts"
   },
   "devDependencies": {
