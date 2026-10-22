@@ -1,0 +1,216 @@
+<title>Barber App Research</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; wide tables scroll inside their own frames. Accent is disinfectant-jar blue, neutrals lean toward clipper steel. */
+:root {
+  --bg: #f5f7f8;
+  --surface: #ffffff;
+  --fg: #16202a;
+  --muted: #5a6875;
+  --line: #d9e0e5;
+  --accent: #0b6fa4;
+  --accent-soft: #e2f0f8;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f3ea;
+  --warn: #9a6200;
+  --warn-soft: #fbf0db;
+  --bad: #b23a2e;
+  --bad-soft: #f8e4e1;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #161e26; --fg: #e4eaef; --muted: #93a2af; --line: #26323d;
+    --accent: #5bb6e8; --accent-soft: #12293a;
+    --ok: #6fcf9b; --ok-soft: #13291f; --warn: #e3b25a; --warn-soft: #2d2412; --bad: #f08a7e; --bad-soft: #301917;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #161e26; --fg: #e4eaef; --muted: #93a2af; --line: #26323d;
+  --accent: #5bb6e8; --accent-soft: #12293a;
+  --ok: #6fcf9b; --ok-soft: #13291f; --warn: #e3b25a; --warn-soft: #2d2412; --bad: #f08a7e; --bad-soft: #301917;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 48px 72px; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); font-weight: 800; font-stretch: 80%; letter-spacing: -0.01em; }
+h2 { font-size: 1.7rem; font-weight: 750; font-stretch: 85%; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+header { display: grid; gap: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 0.85rem/1.4 var(--mono); color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 500; }
+section { display: grid; gap: 22px; }
+.block { display: grid; gap: 12px; }
+.lede { font-size: 1.1rem; color: var(--fg); }
+.findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.findings li { display: grid; grid-template-columns: 4px 1fr; gap: 14px; }
+.findings li::before { content: ""; background: var(--accent); border-radius: 2px; }
+.findings li div { min-width: 0; }
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 12px; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.9rem; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font: 500 0.72rem/1.3 var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); background: var(--bg); }
+td.name { font-weight: 600; white-space: nowrap; }
+td .sub { display: block; color: var(--muted); font-size: 0.82rem; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font: 500 0.72rem/1 var(--mono); padding: 5px 8px; border-radius: 999px; white-space: nowrap; letter-spacing: 0.02em; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.na { background: var(--accent-soft); color: var(--accent); }
+.gaps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 65ch; color: var(--muted); }
+.gaps b { color: var(--fg); font-weight: 600; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.two > div { min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 0; }
+footer { color: var(--muted); font-size: 0.85rem; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Barber App Research</h1>
+    <p class="lede">A barber photographs the client in the chair and the app shows AI previews of different cuts on that client. That is the MVP. Later it grows into a barbershop CRM: bookings, client history, retention.</p>
+    <div class="meta"><span>Updated <b>2026-10-22</b></span><span>Name <b>undecided</b></span><span>Scope <b>competition + naming</b></span></div>
+  </header>
+
+  <section aria-labelledby="summary">
+    <h2 id="summary">Summary</h2>
+    <ul class="findings">
+      <li><div><b>The space is taken, but nobody owns it.</b> Several apps already turn a client photo into AI haircut previews. The barber-first ones are tiny: one solo developer, one with 9 users, one Brazilian launch.</div></li>
+      <li><div><b>Consumer try-on is crowded and mostly unused.</b> FadeLogic has 1 App Store rating and Fadeup has 5. YouCam is the only big one, and hair is a side feature of a makeup app.</div></li>
+      <li><div><b>Booking platforms don't have it yet.</b> Squire, Booksy, Fresha, Vagaro, GlossGenius and the Brazilian tools spend their AI effort on the front desk. Perfect Corp sells an embeddable haircut simulator, so any of them could add previews within months.</div></li>
+      <li><div><b>No one has shown quality on fades or textured hair.</b> No hands-on tests or reviews turned up. That is either the opening or a problem every app shares.</div></li>
+    </ul>
+    <div class="verdict">
+      <h3>What it means for the MVP</h3>
+      <p>The preview alone won't stay unique. The defensible part is what surrounds it: a fast in-chair flow, notes a barber can actually cut from (guard numbers, fade height, lineup shape), and before-and-after photos saved to the client's history. That history is what the CRM grows from, and an incumbent can't license it from Perfect Corp.</p>
+    </div>
+  </section>
+
+  <hr>
+
+  <section aria-labelledby="competition">
+    <h2 id="competition">Competition</h2>
+
+    <div class="block">
+      <h3>Direct: built for barbers</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Product</th><th>What it does</th><th>Market</th><th>Traction</th><th>Threat</th></tr></thead>
+        <tbody>
+          <tr><td class="name">StyleForge</td><td>One photo becomes a 3D head; 500+ hair and beard styles; client profiles and style history<span class="sub">Closest to our concept</span></td><td>Italy first, solo developer, iOS</td><td>Product Hunt launch Jul 2025. Not found in the US, IT, BR or GB App Store on 2026-10-22, so it may be delisted</td><td><span class="pill warn">Medium</span></td></tr>
+          <tr><td class="name">PenteIA</td><td>The shop shares a QR code or link; the client sends a selfie and picks a style</td><td>Brazil, SaaS</td><td>Launch post 2025-12-31. Site resolves but didn't answer our requests</td><td><span class="pill warn">Medium in BR</span></td></tr>
+          <tr><td class="name">BarberBlend AI</td><td>Selfie plus a chosen style gives a result; for barbers and clients</td><td>Web, <span class="num">$9.99</span> and <span class="num">$29.99</span>/mo</td><td><span class="num">9</span> registered users; launched 2026-01-07</td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">HairIsEverything</td><td>Front photo, side-by-side comparison, share to barber</td><td>Web, freemium</td><td>Unknown</td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">LopeStyle</td><td>Booking plus AI preview</td><td>iOS, Uzbekistan</td><td>Unknown</td><td><span class="pill ok">Low</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="block">
+      <h3>Indirect: consumer try-on</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Product</th><th>What it does</th><th>Pricing</th><th>Traction</th><th>Threat</th></tr></thead>
+        <tbody>
+          <tr><td class="name">YouCam Makeup</td><td>Hairstyle and color try-on inside a makeup app (Perfect Corp)</td><td>Freemium</td><td class="num">~215K iOS ratings</td><td><span class="pill warn">Medium</span></td></tr>
+          <tr><td class="name">FadeLogic</td><td>Selfie to AI haircut preview, barber finder</td><td><span class="num">$5.99</span>/wk to <span class="num">$99.99</span>/yr</td><td><span class="num">1</span> rating; v2.9.3 on 2026-07-17<span class="sub">Checked via Apple's App Store API</span></td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">Fadeup</td><td>Selfie to hairstyle, color and beard previews; face-shape analysis</td><td>1 free try, then subscription</td><td><span class="num">5</span> ratings; v2.6 on 2026-09-08<span class="sub">Checked via Apple's App Store API</span></td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">Others</td><td>TryHair.ai, AI Hairstyle TryOn, BarberGPT, Fotor, Facetune, Cutify, MenHair</td><td><span class="num">$1.99</span> to <span class="num">$9.90</span>/mo</td><td>Little or none visible</td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">ChatGPT, Gemini</td><td>Prompts that change only the hair in an uploaded photo</td><td>General subscriptions</td><td>No evidence that clients bring these to barbers</td><td><span class="pill na">Watch</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>None of these gives a barber what they need to do the cut, and none keeps client history. They sell style catalogs to people at home.</p>
+    </div>
+
+    <div class="block">
+      <h3>Incumbent platforms</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Platform</th><th>AI today</th><th>Haircut preview</th><th>Threat</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Squire<span class="sub">US barbershops</span></td><td>Squire AI: phone answering, booking, marketing, reviews, outreach. Launched at a barber expo in September</td><td>No evidence</td><td><span class="pill bad">High</span></td></tr>
+          <tr><td class="name">Fresha<span class="sub">Global</span></td><td>AI Concierge add-on at <span class="num">$99.95</span>/location/mo. Already sells AI as paid add-ons</td><td>No evidence</td><td><span class="pill warn">Medium</span></td></tr>
+          <tr><td class="name">Booksy, Vagaro<span class="sub">Global</span></td><td>Google booking deal; generative marketing copy</td><td>No evidence</td><td><span class="pill warn">Medium</span></td></tr>
+          <tr><td class="name">GlossGenius, Mangomint, Boulevard<span class="sub">US salons</span></td><td>None found; client notes only</td><td>No evidence</td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">Trinks, AppBarber, Belasis, Simples Agenda<span class="sub">Brazil</span></td><td>None found; WhatsApp scheduling, finance, loyalty</td><td>No evidence</td><td><span class="pill ok">Low</span></td></tr>
+          <tr><td class="name">Perfect Corp<span class="sub">B2B supplier</span></td><td>White-label haircut simulator that salons embed in a site or booking flow</td><td>Yes, for sale</td><td><span class="pill bad">Enabler</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="block">
+      <h3>Not verified yet</h3>
+      <ul class="gaps">
+        <li><b>Quality.</b> Nobody tested any app on a real fade, a taper or textured hair. Next step: run FadeLogic, Fadeup and YouCam on a few real client photos.</li>
+        <li><b>Coverage.</b> Google Play, Reddit r/barber, theCut, Square Appointments, StyleSeat, Phorest, Zenoti and Avec were not checked.</li>
+        <li><b>Sources.</b> The incumbent checks came from secondhand pages; no vendor confirmed anything directly.</li>
+        <li><b>Integrations.</b> Whether any platform has a public API a standalone app could plug into.</li>
+      </ul>
+    </div>
+  </section>
+
+  <hr>
+
+  <section aria-labelledby="naming">
+    <h2 id="naming">Naming</h2>
+    <p>No name is chosen yet. About 140 candidates were checked. Most short English names are already taken as <span class="num">.com</span>.</p>
+
+    <div class="block">
+      <h3>Finalists</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Name</th><th>Idea</th><th>Domains</th><th>US trademark</th><th>Products</th><th>Handles</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Mirrorchair</td><td>The mirror is the preview; the chair is the shop and the CRM</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill ok">None found</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Mirrorfade</td><td>Seeing the fade before it's cut</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill ok">None found</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Usualcut</td><td>"The usual?", the classic barber line; suits retention</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill warn">Search lumps it with theCut</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Fadelook</td><td>The look before the cut</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill warn">Near FadeLogic, Fadeup</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Fadeframe</td><td>Framing the fade</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill warn">Crowded fade field</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Chairlens<span class="sub">Fallback</span></td><td>The chair plus the AI lens</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill ok">None found</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Shearlens</td><td>Shears plus lens; reaches stylists too</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill ok">None</span></td><td><span class="pill warn">Close to ShearShare</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Fadelens</td><td>Fade plus lens</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill na">Unchecked</span></td><td><span class="pill warn">"Fade lens" is an eyewear term</span></td><td><span class="pill na">Unchecked</span></td></tr>
+          <tr><td class="name">Barberfolio</td><td>Barber portfolio; fits the CRM</td><td><span class="pill ok">All 6 free</span></td><td><span class="pill na">Unchecked</span></td><td><span class="pill warn">Descriptive, weak mark</span></td><td><span class="pill na">Unchecked</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="meta">Domains checked: .com · .app · .io · .ai · .co · .com.br, via registry RDAP lookups. Trademarks: USPTO wordmark search, live and dead marks.</p>
+    </div>
+
+    <div class="block">
+      <h3>Dropped</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Name</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Fadebook</td><td>Meta owns fadebook.com and has gone after "-book" puns; fadebook.app is a pre-launch FadeBook barber booking app</td></tr>
+          <tr><td class="name">Nextcut</td><td>.com is for sale on Afternic; .co, .io and .ai are in use; a "NEXT CUT" barber booking app is on iOS</td></tr>
+          <tr><td class="name">Nextlook</td><td>.com, .io, .ai and .co are taken; a delisted iOS app called "NextLook Hairstyles" used the exact name</td></tr>
+          <tr><td class="name">Chairbook</td><td>.com and .app are taken; chairbook.app shows ChairKeeper, a salon scheduling product</td></tr>
+          <tr><td class="name">Lineup</td><td>lineup.com is an established media ERP company; .app is taken</td></tr>
+          <tr><td class="name">Regulars</td><td>.com is listed for sale on Spaceship; .app is taken</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section aria-labelledby="next">
+    <h2 id="next">Next steps</h2>
+    <div class="two">
+      <div class="card"><h3>Test the competition</h3><p>Run FadeLogic, Fadeup and YouCam on a few real client photos, including a fade and textured hair, to see whether the quality gap is real.</p></div>
+      <div class="card"><h3>Choose a position</h3><p>Decide how to position against Squire and Perfect Corp, and whether to launch in Brazil or the US first.</p></div>
+      <div class="card"><h3>Pick a name</h3><p>Pick a direction, then check Instagram, TikTok and X handles and register the .com and .app.</p></div>
+    </div>
+  </section>
+
+  <footer>Research gathered 2026-10-22 from web searches, App Store lookups, registry RDAP and the USPTO trademark search. Treat "no evidence" as "not found by these searches", not as confirmed absence.</footer>
+</div>
