@@ -18,7 +18,7 @@ export type VisitStatus = (typeof VISIT_STATUSES)[number];
 export const UPLOAD_STATUSES = Constants.public.Enums.upload_status;
 export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
 
-export const PREVIEW_STATUSES = ['pending', 'running', 'done', 'failed', 'refused'] as const;
+export const PREVIEW_STATUSES = Constants.public.Enums.preview_status;
 export type PreviewStatus = (typeof PREVIEW_STATUSES)[number];
 
 export interface Shop {
@@ -86,6 +86,18 @@ export interface Preview {
   beardStyleId: string;
   slot: PhotoSlot;
   status: PreviewStatus;
+  // Claims so far; the worker fails a row for good after its third.
+  attemptCount: number;
+  // Higher is claimed first: see PREVIEW_PRIORITY.
+  priority: number;
+  // A pending row is not claimed before this.
+  notBefore: string;
   storagePath: string | null;
   thumbnailPath: string | null;
+  error: string | null;
+  claimedAt: string | null;
+  completedAt: string | null;
+  // Set when the nightly cleanup deleted the objects; the row stays.
+  purgedAt: string | null;
+  createdAt: string;
 }
