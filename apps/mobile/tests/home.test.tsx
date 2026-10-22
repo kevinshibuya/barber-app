@@ -6,6 +6,7 @@ import { client, rafa, visit } from './support/fixtures';
 
 beforeEach(() => {
   jest.mocked(api.getCurrentBarber).mockResolvedValue(rafa);
+  jest.mocked(api.listOpenVisitsToday).mockResolvedValue([]);
 });
 
 describe('home', () => {

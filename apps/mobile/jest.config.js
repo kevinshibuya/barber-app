@@ -6,11 +6,15 @@ module.exports = {
   // jest-expo turns this on; a gate naming a missing test file must fail.
   passWithNoTests: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  // A file's first `renderRouter` loads every route; on a machine busy with
+  // parallel gates that alone can pass Jest's 5 s default.
+  testTimeout: 30_000,
   moduleNameMapper: {
     // NativeWind compiles global.css at bundle time; tests need no styles.
     '\\.css$': '<rootDir>/tests/stubs/style.js',
     '^@/(.*)$': '<rootDir>/$1',
     '^@barber/shared$': '<rootDir>/../../packages/shared/src',
+    '^lucide-react-native$': '<rootDir>/tests/stubs/lucide.js',
   },
   // jest-expo's list, plus the UI libraries that ship untranspiled JSX.
   transformIgnorePatterns: [

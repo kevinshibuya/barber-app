@@ -7,6 +7,7 @@ import { rafa } from './support/fixtures';
 beforeEach(() => {
   jest.mocked(api.getCurrentBarber).mockResolvedValue(null);
   jest.mocked(api.listRecentVisits).mockResolvedValue([]);
+  jest.mocked(api.listOpenVisitsToday).mockResolvedValue([]);
 });
 
 describe('password reset', () => {

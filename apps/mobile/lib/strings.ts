@@ -44,6 +44,7 @@ export const strings = {
     newClient: 'Novo cliente',
     recentVisits: 'Visitas recentes',
     noVisits: 'Nenhuma visita ainda.',
+    openToday: 'Abertas hoje',
     noClients: 'Nenhum cliente encontrado.',
     loadFailed: 'Não foi possível carregar. Puxe para tentar de novo.',
     signOut: 'Sair',
@@ -72,6 +73,26 @@ export const strings = {
   },
   newVisit: {
     title: 'Nova visita',
+    privacy:
+      'Vamos fotografar o cliente para gerar prévias de corte com inteligência artificial. As fotos são enviadas a um serviço de IA só para isso e ficam no histórico do cliente nesta barbearia. As prévias não escolhidas são apagadas em 7 dias, e o link enviado ao cliente expira em 30 dias.',
+    consent: 'O cliente concordou com as fotos',
+    takePhotos: 'Tirar fotos',
+    failed: 'Não foi possível abrir a visita. Verifique sua conexão e tente de novo.',
+  },
+  photos: {
+    title: 'Fotos',
+    slots: { front: 'Frente', left: 'Esquerda', right: 'Direita', back: 'Trás' },
+    required: 'Obrigatória',
+    optional: 'Opcional',
+    status: { empty: 'Sem foto', uploading: 'Enviando…', uploaded: 'Enviada', failed: 'Falha no envio' },
+    camera: 'Câmera',
+    gallery: 'Galeria',
+    retry: 'Tentar de novo',
+    cameraDenied: 'Permita o acesso à câmera nas configurações do celular.',
+    continue: 'Continuar',
+  },
+  picker: {
+    title: 'Escolher visual',
     comingSoon: 'Em breve.',
   },
   notFound: {

@@ -7,6 +7,7 @@ import { client, rafa, visit } from './support/fixtures';
 beforeEach(() => {
   jest.mocked(api.getCurrentBarber).mockResolvedValue(rafa);
   jest.mocked(api.listRecentVisits).mockResolvedValue([]);
+  jest.mocked(api.listOpenVisitsToday).mockResolvedValue([]);
 });
 
 describe('clients', () => {
@@ -68,13 +69,13 @@ describe('clients', () => {
     expect(api.listClientVisits).toHaveBeenCalledWith('c1');
   });
 
-  it('routes new visit to its placeholder', async () => {
+  it('starts a new visit at its consent screen', async () => {
     jest.mocked(api.getClient).mockResolvedValue(client({ id: 'c1' }));
     jest.mocked(api.listClientVisits).mockResolvedValue([]);
     await renderRouter('./app', { initialUrl: '/clients/c1' });
 
     await fireEvent.press(await screen.findByRole('button', { name: strings.client.newVisit }));
 
-    expect(await screen.findByText(strings.newVisit.comingSoon)).toBeOnTheScreen();
+    expect(await screen.findByText(strings.newVisit.privacy)).toBeOnTheScreen();
   });
 });
