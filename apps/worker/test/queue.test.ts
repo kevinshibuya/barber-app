@@ -338,7 +338,7 @@ describe('the worker\'s configuration', () => {
     expect(provider).toBeInstanceOf(FakeImageProvider);
     expect(provider.name).toBe('fake');
     expect(() => readPreviewWorkerConfig({ IMAGE_PROVIDER: 'dall-e' })).toThrow(
-      'IMAGE_PROVIDER is dall-e: expected one of gemini, flux, seedream, fake',
+      'IMAGE_PROVIDER is dall-e: expected one of gemini, nano-banana-2.1, flux, flux-klein, seedream, fake',
     );
   });
 

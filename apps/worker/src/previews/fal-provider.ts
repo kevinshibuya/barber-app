@@ -103,6 +103,21 @@ export class FluxImageProvider implements ImageProvider {
   }
 }
 
+// FLUX.2 [klein] 4B, the small open-weight FLUX.2, on the same request as Pro.
+export class FluxKleinImageProvider implements ImageProvider {
+  readonly name = 'flux-klein';
+
+  constructor(private readonly options: HttpProviderOptions) {}
+
+  async render(request: RenderRequest): Promise<RenderResult> {
+    const image = await renderOnFal(this.options, this.name, 'fal-ai/flux-2/klein/4b/edit', request, {
+      image_size: await oneK(request.base),
+      output_format: 'jpeg',
+    });
+    return Buffer.isBuffer(image) ? { ok: true, image } : image;
+  }
+}
+
 // Seedream 4.5 renders no smaller than about 3.7 megapixels, so it is asked
 // for its smallest preset, 2K at the base's aspect ratio, and the render is
 // scaled down to 1K here.

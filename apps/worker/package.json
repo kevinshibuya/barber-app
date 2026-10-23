@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
-    "smoke:client-page": "jest --testRegex '\\.smoke\\.ts$' test/smoke/client-page.smoke.ts"
+    "smoke:client-page": "jest --testRegex '\\.smoke\\.ts$' test/smoke/client-page.smoke.ts",
+    "bakeoff": "pnpm run build && node --env-file-if-exists=.env dist/bakeoff/run"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

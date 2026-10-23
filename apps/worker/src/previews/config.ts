@@ -9,7 +9,9 @@ export interface PreviewWorkerConfig {
   staleAfterSeconds: number;
 }
 
-export const DEFAULT_IMAGE_PROVIDER: ImageProviderName = 'gemini';
+// The bake-off's pick (#18): it kept the client in every render, at about
+// $0.037 a render. docs/bakeoff/ has the results.
+export const DEFAULT_IMAGE_PROVIDER: ImageProviderName = 'nano-banana-2.1';
 
 function isProviderName(value: string): value is ImageProviderName {
   return IMAGE_PROVIDERS.some((name) => name === value);

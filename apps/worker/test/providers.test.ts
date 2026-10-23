@@ -5,7 +5,7 @@
 import sharp from 'sharp';
 import { readPreviewWorkerConfig } from '../src/previews/config';
 import type { ImageProvider, RenderRequest } from '../src/previews/image-provider';
-import { FluxImageProvider, SeedreamImageProvider } from '../src/previews/fal-provider';
+import { FluxImageProvider, FluxKleinImageProvider, SeedreamImageProvider } from '../src/previews/fal-provider';
 import { GeminiImageProvider } from '../src/previews/gemini-provider';
 import { createImageProvider } from '../src/previews/providers';
 
@@ -129,6 +129,28 @@ function falImage(url: string, extra: Record<string, unknown> = {}): Response {
   return json(200, { images: [{ url, content_type: 'image/jpeg' }], seed: 7, ...extra });
 }
 
+describe('the Nano Banana 2.1 provider', () => {
+  it('is the Gemini provider on the Nano Banana 2.1 model', async () => {
+    const http = transport(geminiImage(rendered));
+    const provider: ImageProvider = new GeminiImageProvider(
+      { apiKey: 'gemini-key', fetch: http.fetch },
+      'nano-banana-2.1',
+    );
+
+    const result = await provider.render(request);
+
+    expect(result).toEqual({ ok: true, image: rendered });
+    expect(provider.name).toBe('nano-banana-2.1');
+    const [sent] = http.sent;
+    expect(sent!.url).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-nano-banana-2.1:generateContent',
+    );
+    expect(sent!.body).toMatchObject({
+      generationConfig: { responseModalities: ['IMAGE'], imageConfig: { imageSize: '1K' } },
+    });
+  });
+});
+
 describe('the FLUX.2 Pro Edit provider', () => {
   it('sends the base photo, the reference image and the prompt to fal.ai for a 1K image, and returns its bytes', async () => {
     const large = await sharp({ create: { width: 1536, height: 2048, channels: 3, background: '#a33' } })
@@ -150,6 +172,27 @@ describe('the FLUX.2 Pro Edit provider', () => {
       prompt: expect.stringContaining(PROMPT),
       image_urls: [dataUri(large, 'image/jpeg'), dataUri(request.references[0]!, 'image/png')],
       image_size: { width: 768, height: 1024 },
+      sync_mode: true,
+    });
+  });
+});
+
+describe('the FLUX.2 [klein] 4B Edit provider', () => {
+  it('sends the base photo, the reference image and the prompt to fal.ai for a 1K JPEG, and returns its bytes', async () => {
+    const http = transport(falImage(dataUri(rendered, 'image/png')));
+    const provider: ImageProvider = new FluxKleinImageProvider({ apiKey: 'fal-key', fetch: http.fetch });
+
+    const result = await provider.render(request);
+
+    expect(result).toEqual({ ok: true, image: rendered });
+    expect(provider.name).toBe('flux-klein');
+    const [sent] = http.sent;
+    expect(sent!.url).toBe('https://fal.run/fal-ai/flux-2/klein/4b/edit');
+    expect(sent!.headers.get('authorization')).toBe('Key fal-key');
+    expect(sent!.body).toMatchObject({
+      prompt: expect.stringContaining(PROMPT),
+      image_urls: [dataUri(request.base, 'image/jpeg'), dataUri(request.references[0]!, 'image/png')],
+      output_format: 'jpeg',
       sync_mode: true,
     });
   });
@@ -247,23 +290,35 @@ describe('choosing the provider at boot', () => {
     return createImageProvider(readPreviewWorkerConfig(env).provider, env);
   }
 
-  it('runs Gemini when no provider is configured, on its configured key', () => {
-    expect(boot({ GEMINI_API_KEY: 'g' })).toBeInstanceOf(GeminiImageProvider);
+  // The bake-off's pick (#18).
+  it('runs Nano Banana 2.1 when no provider is configured, on the Gemini key', () => {
+    const provider = boot({ GEMINI_API_KEY: 'g' });
+    expect(provider).toBeInstanceOf(GeminiImageProvider);
+    expect(provider.name).toBe('nano-banana-2.1');
   });
 
-  it('runs FLUX.2 or Seedream by their configured names, on the fal.ai key', () => {
+  it('runs FLUX.2, FLUX.2 [klein] or Seedream by their configured names, on the fal.ai key', () => {
     expect(boot({ IMAGE_PROVIDER: 'flux', FAL_KEY: 'f' })).toBeInstanceOf(FluxImageProvider);
+    expect(boot({ IMAGE_PROVIDER: 'flux-klein', FAL_KEY: 'f' })).toBeInstanceOf(FluxKleinImageProvider);
     expect(boot({ IMAGE_PROVIDER: 'seedream', FAL_KEY: 'f' })).toBeInstanceOf(SeedreamImageProvider);
+  });
+
+  it('runs Nano Banana 2.1 by its configured name, on the Gemini key', () => {
+    const provider = boot({ IMAGE_PROVIDER: 'nano-banana-2.1', GEMINI_API_KEY: 'g' });
+    expect(provider).toBeInstanceOf(GeminiImageProvider);
+    expect(provider.name).toBe('nano-banana-2.1');
   });
 
   it('fails on an unknown provider name with the names it knows', () => {
     expect(() => boot({ IMAGE_PROVIDER: 'midjourney', FAL_KEY: 'f', GEMINI_API_KEY: 'g' })).toThrow(
-      'IMAGE_PROVIDER is midjourney: expected one of gemini, flux, seedream, fake',
+      'IMAGE_PROVIDER is midjourney: expected one of gemini, nano-banana-2.1, flux, flux-klein, seedream, fake',
     );
   });
 
   it('fails when the configured provider has no key', () => {
-    expect(() => boot({ GEMINI_API_KEY: '' })).toThrow('GEMINI_API_KEY is not set: the gemini image provider needs it');
+    expect(() => boot({ GEMINI_API_KEY: '' })).toThrow(
+      'GEMINI_API_KEY is not set: the nano-banana-2.1 image provider needs it',
+    );
     expect(() => boot({ IMAGE_PROVIDER: 'seedream', GEMINI_API_KEY: 'g' })).toThrow(
       'FAL_KEY is not set: the seedream image provider needs it',
     );
