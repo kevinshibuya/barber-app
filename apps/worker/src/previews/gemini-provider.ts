@@ -1,7 +1,8 @@
 // Google Gemini image, the Nano Banana 2 line, through generateContent. The
 // base image, the references and the instruction go in one user turn; the
 // answer's first inline image is the render. A prompt blocked, a candidate
-// stopped on safety grounds, or an answer in text only is the model's refusal.
+// stopped on safety grounds, or an answer in text only that stopped normally
+// is the model's refusal.
 import type { ImageProvider, RenderRequest, RenderResult } from './image-provider';
 import {
   editInstruction,
@@ -89,9 +90,12 @@ export class GeminiImageProvider implements ImageProvider {
     if (image) return { ok: true, image };
     const finishReason = typeof candidate.finishReason === 'string' ? candidate.finishReason : 'none';
     if (SAFETY_FINISH_REASONS.has(finishReason)) return refused(`gemini: refused (${finishReason})`);
-    // Asked for an image only, the model answering in words is a decline.
+    // Asked for an image only, the model answering in words and stopping
+    // normally is a decline. Cut short or failed, it is worth another try.
     const text = textOf(parts);
-    if (text !== '') return refused(`gemini: declined in text: ${text.slice(0, 200)}`);
+    if (finishReason === 'STOP' && text !== '') {
+      return refused(`gemini: declined in text: ${Array.from(text).slice(0, 200).join('')}`);
+    }
     return retryable(`gemini: no image in the answer (finish reason ${finishReason})`);
   }
 }
