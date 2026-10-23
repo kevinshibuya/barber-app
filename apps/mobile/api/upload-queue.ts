@@ -19,7 +19,8 @@ export type Upload =
   | { kind: 'after'; visitId: string; shot: LocalImage };
 
 // Everything the queue sends over the network. A send that rejects is tried
-// again later; sending an upload twice must leave the server as sending it once.
+// again later, unless the queue's `isPermanent` says no retry can succeed;
+// sending an upload twice must leave the server as sending it once.
 export interface UploadTransport {
   send(upload: Upload): Promise<void>;
 }
@@ -31,8 +32,10 @@ export interface QueueStorage {
 }
 
 // Sending: added this session and not yet failed. Waiting: an attempt failed,
-// or the app closed before it was sent, and a retry is due. Sent: on the server.
-export type DeliveryStatus = 'sending' | 'waiting' | 'sent';
+// or the app closed before it was sent, and a retry is due. Sent: on the
+// server. Failed: the server refused it in a way no retry changes, so it was
+// set aside.
+export type DeliveryStatus = 'sending' | 'waiting' | 'sent' | 'failed';
 
 export interface DeliveryProgress {
   upload: Upload;
@@ -49,13 +52,24 @@ export interface QueueState {
 }
 
 export interface Delivery {
-  // Resolves once this upload, or a later one of the same key, is sent.
+  // Resolves once this upload, or a later one of the same key, is sent;
+  // rejects if it fails for good.
   sent: Promise<void>;
 }
 
+// Each upload belongs to the barber who made it: it is sent only while that
+// barber is signed in, so it is recorded as theirs and never under another
+// shop. An upload stored before owners were kept has none and goes with
+// whoever is signed in.
 interface Item {
   upload: Upload;
+  owner: string | null;
   attempts: number;
+}
+
+interface Waiter {
+  resolve: () => void;
+  reject: (error: unknown) => void;
 }
 
 export const QUEUE_STORAGE_KEY = 'barber.upload-queue';
@@ -84,27 +98,36 @@ export function photoKey(visitId: string, slot: PhotoSlot): string {
 // in storage after every change: a fresh queue on the same storage, as after
 // the app is killed, picks up where the last one stopped. A failed send is
 // retried after a delay that doubles from `baseDelayMs` up to `maxDelayMs`,
-// until it succeeds.
+// until it succeeds; one `isPermanent` calls hopeless is set aside, and the
+// uploads behind it go on. `owner` names the signed-in barber, whose uploads
+// alone are sent.
 export function uploadQueue({
   storage,
   transport,
+  owner,
+  isPermanent = () => false,
   baseDelayMs = BASE_DELAY_MS,
   maxDelayMs = MAX_DELAY_MS,
   storageKey = QUEUE_STORAGE_KEY,
 }: {
   storage: QueueStorage;
   transport: UploadTransport;
+  owner: () => Promise<string | null>;
+  isPermanent?: (error: unknown) => boolean;
   baseDelayMs?: number;
   maxDelayMs?: number;
   storageKey?: string;
 }) {
   let items: Item[] = [];
   const progress = new Map<string, DeliveryProgress>();
-  const waiters = new Map<string, (() => void)[]>();
+  const waiters = new Map<string, Waiter[]>();
   const listeners = new Set<(state: QueueState) => void>();
   let offline = false;
   let failures = 0;
   let inFlight: Item | null = null;
+  // Held for a whole drain, its storage writes included, so two drains never
+  // send at once.
+  let draining = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   let loaded: Promise<void> | null = null;
@@ -119,12 +142,13 @@ export function uploadQueue({
     for (const listener of listeners) listener(snapshot);
   }
 
-  // Writes are chained so the last one stored is the latest queue.
+  // Writes are chained so the last one stored is the latest queue. The
+  // returned write rejects when storage refuses it; the chain goes on.
   function persist(): Promise<void> {
-    writes = writes
-      .then(() => storage.setItem(storageKey, JSON.stringify(items.map((item) => item.upload))))
-      .catch(() => undefined);
-    return writes;
+    const snapshot = JSON.stringify(items.map(({ upload, owner: by }) => ({ upload, owner: by })));
+    const write = writes.then(() => storage.setItem(storageKey, snapshot));
+    writes = write.catch(() => undefined);
+    return write;
   }
 
   // Storage that cannot be read, or holds what is not a queue, starts the
@@ -135,7 +159,9 @@ export function uploadQueue({
       .then((raw) => {
         const stored: unknown = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(stored)) return;
-        items = stored.map((upload: Upload) => ({ upload, attempts: 0 }));
+        items = stored.map((entry: { upload: Upload; owner: string | null } | Upload) =>
+          'kind' in entry ? { upload: entry, owner: null, attempts: 0 } : { ...entry, attempts: 0 },
+        );
         for (const { upload } of items) progress.set(uploadKey(upload), { upload, status: 'waiting' });
         if (items.length > 0) emit();
       })
@@ -143,8 +169,7 @@ export function uploadQueue({
     return loaded;
   }
 
-  function schedule() {
-    const delay = Math.min(baseDelayMs * 2 ** (failures - 1), maxDelayMs);
+  function schedule(delay = Math.min(baseDelayMs * 2 ** (failures - 1), maxDelayMs)) {
     timer = setTimeout(() => {
       timer = null;
       void drain();
@@ -157,34 +182,63 @@ export function uploadQueue({
     // A newer upload of the key is still owed; its progress stands.
     if (items.some((other) => uploadKey(other.upload) === key)) return;
     progress.set(key, { upload: item.upload, status: 'sent' });
-    for (const resolve of waiters.get(key) ?? []) resolve();
+    for (const waiter of waiters.get(key) ?? []) waiter.resolve();
+    waiters.delete(key);
+  }
+
+  function setAside(item: Item, error: unknown) {
+    const key = uploadKey(item.upload);
+    items = items.filter((other) => other !== item);
+    if (items.some((other) => uploadKey(other.upload) === key)) return;
+    progress.set(key, { upload: item.upload, status: 'failed' });
+    for (const waiter of waiters.get(key) ?? []) waiter.reject(error);
     waiters.delete(key);
   }
 
   async function drain() {
-    if (inFlight || stopped) return;
-    while (items.length > 0 && !stopped) {
-      const item = items[0]!;
-      inFlight = item;
-      try {
-        await transport.send(item.upload);
-      } catch {
-        inFlight = null;
-        item.attempts += 1;
-        failures += 1;
-        offline = true;
-        const key = uploadKey(item.upload);
-        if (progress.get(key)?.upload === item.upload) progress.set(key, { upload: item.upload, status: 'waiting' });
-        emit();
-        if (!stopped) schedule();
+    if (draining || stopped) return;
+    draining = true;
+    try {
+      const me = await owner();
+      // No barber to send as, such as a session that cannot refresh offline:
+      // look again later.
+      if (me === null) {
+        if (items.length > 0 && !stopped) schedule(maxDelayMs);
         return;
       }
-      inFlight = null;
-      failures = 0;
-      offline = false;
-      delivered(item);
-      await persist();
-      emit();
+      for (;;) {
+        if (stopped) return;
+        const item = items.find((candidate) => candidate.owner === null || candidate.owner === me);
+        if (!item) return;
+        inFlight = item;
+        try {
+          await transport.send(item.upload);
+        } catch (error) {
+          inFlight = null;
+          if (isPermanent(error)) {
+            setAside(item, error);
+            await persist().catch(() => undefined);
+            emit();
+            continue;
+          }
+          item.attempts += 1;
+          failures += 1;
+          offline = true;
+          const key = uploadKey(item.upload);
+          if (progress.get(key)?.upload === item.upload) progress.set(key, { upload: item.upload, status: 'waiting' });
+          emit();
+          if (!stopped) schedule();
+          return;
+        }
+        inFlight = null;
+        failures = 0;
+        offline = false;
+        delivered(item);
+        await persist().catch(() => undefined);
+        emit();
+      }
+    } finally {
+      draining = false;
     }
   }
 
@@ -203,17 +257,29 @@ export function uploadQueue({
       wake();
     },
 
-    // Queues the upload, in place of one of the same key still waiting, and
-    // resolves once it is in storage.
+    // Queues the signed-in barber's upload, in place of one of the same key
+    // still waiting, and resolves once it is in storage. Rejects, with the
+    // queue as it was, when storage refuses it.
     async add(upload: Upload): Promise<Delivery> {
-      await load();
+      const [by] = await Promise.all([owner(), load()]);
       const key = uploadKey(upload);
+      const before = { items, progress: progress.get(key) };
       items = items.filter((item) => item === inFlight || uploadKey(item.upload) !== key);
-      items.push({ upload, attempts: 0 });
+      items.push({ upload, owner: by, attempts: 0 });
       progress.set(key, { upload, status: 'sending' });
-      const sent = new Promise<void>((resolve) => waiters.set(key, [...(waiters.get(key) ?? []), resolve]));
+      try {
+        await persist();
+      } catch (error) {
+        items = before.items;
+        if (before.progress) progress.set(key, before.progress);
+        else progress.delete(key);
+        emit();
+        throw error;
+      }
+      const sent = new Promise<void>((resolve, reject) =>
+        waiters.set(key, [...(waiters.get(key) ?? []), { resolve, reject }]),
+      );
       emit();
-      await persist();
       wake();
       return { sent };
     },

@@ -52,6 +52,7 @@ const QUEUED_STATUS: Record<DeliveryStatus, SlotStatus> = {
   sending: 'uploading',
   waiting: 'waiting',
   sent: 'uploaded',
+  failed: 'failed',
 };
 
 // The upload queue speaks for every slot it has a shot of, including one a
