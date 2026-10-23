@@ -10,3 +10,5 @@ build/
 coverage/
 *.tsbuildinfo
 apps/worker/bakeoff-results/
+# Generated logins for the demo shop (scripts in docs/release.md).
+deploy/*.local.md

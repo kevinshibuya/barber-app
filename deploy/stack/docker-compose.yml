@@ -1,0 +1,36 @@
+# barber-worker on the server: the preview queue, the nightly cleanup and the client
+# page, in one container. Caddy (~/apps/caddy) terminates HTTPS and reaches it
+# as barber-worker:3000 on the external `web` network; nothing is published.
+# The caps follow the server repo's docs/a1-resources.md: cpu_shares under Docker's
+# default 1024, so the voice server wins any contention.
+name: barber-worker
+
+services:
+  worker:
+    image: barber-worker:${IMAGE_TAG}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+    mem_limit: 512m
+    cpus: 0.5
+    cpu_shares: 512
+    pids_limit: 256
+    restart: unless-stopped
+    networks:
+      web:
+        aliases: [barber-worker]
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+networks:
+  web:
+    external: true
