@@ -1,12 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthApiError, AuthRetryableFetchError } from '@supabase/supabase-js';
 import { BARBER_STORAGE_KEY, getCurrentBarber, signIn, signOut, watchSession } from '@/api/auth';
 import { clearReadCache } from '@/api/reads';
-import { supabase } from '@/api/supabase';
 import { rafa } from './support/fixtures';
 
+// The Supabase client stays private to the api module: the test replaces it
+// behind the module, and takes the auth errors from the real library.
 jest.mock('@/api/supabase', () => ({ supabase: jest.fn() }));
 jest.mock('@/api/reads', () => ({ clearReadCache: jest.fn(async () => undefined) }));
+const { supabase } = jest.requireMock<{ supabase: jest.Mock }>('@/api/supabase');
+const { AuthApiError, AuthRetryableFetchError } =
+  jest.requireActual<typeof import('@supabase/supabase-js')>('@supabase/supabase-js');
 
 const row = { id: rafa.id, shop_id: rafa.shopId, display_name: rafa.displayName, role: rafa.role };
 const session = { user: { id: rafa.id } };
@@ -33,7 +36,7 @@ function fakeSupabase({
     },
     from: jest.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle: barberRead }) }) })),
   };
-  jest.mocked(supabase).mockReturnValue(client as unknown as ReturnType<typeof supabase>);
+  supabase.mockReturnValue(client);
   return { client, emit: (event: string) => onEvent(event) };
 }
 
