@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@parcel/watcher': false
+  unrs-resolver: false
+
+minimumReleaseAgeExclude:
+  - '@expo/cli@58.1.14'
+  - babel-preset-expo@58.0.19
+  - expo-router@58.0.25
+  - expo@58.0.17
