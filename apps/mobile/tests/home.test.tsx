@@ -54,6 +54,6 @@ describe('home', () => {
 
     expect(await screen.findByText('Mariana Costa')).toBeOnTheScreen();
     expect(screen.getByText('Ana Souza')).toBeOnTheScreen();
-    expect(api.searchClients).toHaveBeenLastCalledWith('an');
+    expect(api.searchClients).toHaveBeenLastCalledWith('an', expect.any(Function));
   });
 });

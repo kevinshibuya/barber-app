@@ -1,3 +1,4 @@
+import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { Screen } from '@/components/screen';
 import { VisitRow } from '@/components/visit-row';
 import { Button } from '@/components/ui/button';
@@ -20,12 +21,14 @@ export default function ClientScreen() {
   const [visits, setVisits] = useState<VisitSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
 
+  // What the device holds first, then the network's.
   const load = useCallback(async () => {
     setFailed(false);
+    const showVisits = (history: VisitSummary[]) => setVisits(newestFirst(history));
     try {
-      const [found, history] = await Promise.all([getClient(id), listClientVisits(id)]);
+      const [found, history] = await Promise.all([getClient(id, setClient), listClientVisits(id, showVisits)]);
       setClient(found);
-      setVisits(newestFirst(history));
+      showVisits(history);
     } catch {
       setFailed(true);
     }
@@ -56,6 +59,7 @@ export default function ClientScreen() {
           <Text variant="muted">{client.phone ?? strings.client.noPhone}</Text>
         </View>
       )}
+      <ConnectivityIndicator />
       <Button onPress={() => router.push({ pathname: '/clients/[id]/new-visit', params: { id } })}>
         <Text>{strings.client.newVisit}</Text>
       </Button>

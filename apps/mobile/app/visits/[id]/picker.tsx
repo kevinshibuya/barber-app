@@ -1,3 +1,4 @@
+import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { FormError } from '@/components/form-error';
 import { FullScreenPreview } from '@/components/full-screen-preview';
 import { ChoosePill, LookStatus } from '@/components/look-status';
@@ -265,9 +266,12 @@ export default function PickerScreen() {
           <Pressable role="button" accessibilityLabel={strings.picker.a11y.back} onPress={back} className="p-2">
             <Icon as={ArrowLeft} size={24} className="text-white" />
           </Pressable>
-          <Text numberOfLines={1} className="flex-1 text-center text-base font-semibold text-white">
-            {data.clientName}
-          </Text>
+          <View className="flex-1 items-center">
+            <Text numberOfLines={1} className="text-center text-base font-semibold text-white">
+              {data.clientName}
+            </Text>
+            <ConnectivityIndicator inverted />
+          </View>
           <Button variant="link" size="sm" onPress={finish}>
             <Text className="text-white">{strings.picker.finish}</Text>
           </Button>

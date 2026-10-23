@@ -65,20 +65,27 @@ function fittedSize(width: number, height: number): { width: number; height: num
 // Uploads one slot's shot: downscaled, written to its object path while its
 // row says uploading, then flipped to uploaded. A retake of an uploaded photo
 // goes to a new path, so the schema replaces the slot's previews; a retry of
-// a failed upload reuses the path it had. Rejects when any step fails, with
-// the row left uploading.
+// a failed upload reuses the path it had. A shot given a take goes to that
+// take's path, and a take already uploaded there is not sent again, so a
+// retry after a lost response leaves the slot's previews alone. Rejects when
+// any step fails, with the row left uploading.
 export function photoUploader(transport: PhotoTransport, images: ImageTool) {
-  return async function upload(shot: PhotoUpload): Promise<Photo> {
+  return async function upload(shot: PhotoUpload, take?: string): Promise<Photo> {
     const { visitId, slot } = shot;
     const [{ shopId, photo: current }, image] = await Promise.all([
       transport.slotOf(visitId, slot),
       images.toJpeg(shot, fittedSize(shot.width, shot.height)),
     ]);
 
+    const takePath = take === undefined ? null : originalPhotoPath(shopId, visitId, slot, take);
+    if (current?.uploadStatus === 'uploaded' && current.storagePath === takePath) return current;
+
     const retake = current?.uploadStatus === 'uploaded';
-    const storagePath = retake
-      ? originalPhotoPath(shopId, visitId, slot, Date.now().toString(36))
-      : (current?.storagePath ?? originalPhotoPath(shopId, visitId, slot));
+    const storagePath =
+      takePath ??
+      (retake
+        ? originalPhotoPath(shopId, visitId, slot, Date.now().toString(36))
+        : (current?.storagePath ?? originalPhotoPath(shopId, visitId, slot)));
     const row = { visitId, slot, storagePath, width: image.width, height: image.height };
 
     await transport.savePhoto({ ...row, uploadStatus: 'uploading' });
@@ -86,7 +93,7 @@ export function photoUploader(transport: PhotoTransport, images: ImageTool) {
     const uploaded = await transport.savePhoto({ ...row, uploadStatus: 'uploaded' });
 
     // The replaced take has no row pointing at it any more.
-    if (retake && current.storagePath !== storagePath) {
+    if (current && current.storagePath !== storagePath) {
       await transport.removeOriginal(current.storagePath).catch(() => undefined);
     }
     return uploaded;
@@ -174,8 +181,9 @@ const supabaseTransport: PhotoTransport = {
 
 const uploadWithSupabase = photoUploader(supabaseTransport, deviceImages);
 
-export async function uploadPhoto(shot: PhotoUpload): Promise<Photo> {
-  return uploadWithSupabase(shot);
+// Sends one take of a slot now. Screens queue it with `uploadPhoto` instead.
+export async function sendPhoto(shot: PhotoUpload, take: string): Promise<Photo> {
+  return uploadWithSupabase(shot, take);
 }
 
 // The visit's photos in slot order, each with a signed URL to show it.
@@ -232,6 +240,7 @@ const afterPhotoTransport: AfterPhotoTransport = {
 
 const uploadAfterWithSupabase = afterPhotoUploader(afterPhotoTransport, deviceImages);
 
-export async function uploadAfterPhoto(visitId: string, shot: LocalImage): Promise<Visit> {
+// Sends the after photo now. Screens queue it with `uploadAfterPhoto` instead.
+export async function sendAfterPhoto(visitId: string, shot: LocalImage): Promise<Visit> {
   return uploadAfterWithSupabase(visitId, shot);
 }
