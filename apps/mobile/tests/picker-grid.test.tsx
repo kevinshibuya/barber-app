@@ -12,11 +12,19 @@ const FRONT_URL = 'https://storage.test/front.jpg';
 const HAIR_STYLES = ['Degradê baixo', 'Máquina', 'Topete'];
 const BEARD_STYLES = ['Barba por fazer', 'Cavanhaque'];
 
+// The phone's navigation bar, as the safe-area inset a test sets.
+let mockBottomInset = 0;
+jest.mock('react-native-safe-area-context', () => {
+  const actual = jest.requireActual('react-native-safe-area-context');
+  return { ...actual, useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: mockBottomInset, left: 0 }) };
+});
+
 // The scripted subscription: the test emits the visit's previews.
 let emit: (previews: VisitPreview[]) => Promise<void> = async () => undefined;
 const unsubscribe = jest.fn();
 
 beforeEach(() => {
+  mockBottomInset = 0;
   emit = async () => undefined;
   unsubscribe.mockReset();
   jest.mocked(api.getVisit).mockResolvedValue(openVisit());
@@ -60,6 +68,16 @@ async function showTab(dimension: 'hair' | 'beard') {
 }
 
 describe('picker grid', () => {
+  it('ends the grid clear of the navigation bar, so the last row can scroll into view', async () => {
+    mockBottomInset = 48;
+    await openPicker();
+
+    expect(screen.getByTestId('picker-grid')).toHaveProp(
+      'contentContainerStyle',
+      expect.objectContaining({ paddingBottom: 16 + 48 }),
+    );
+  });
+
   it('shows every style with its reference image and name, then each thumbnail as its preview is done', async () => {
     await openPicker();
 
