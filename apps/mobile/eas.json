@@ -1,0 +1,46 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wftgkhawtihaujbllcmu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmdGdraGF3dGloYXVqYmxsY211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3NTE1OTEsImV4cCI6MjEwODMyNzU5MX0.GJ9KxvoNKLg8EA9Fo9d8cMdNRmQxFFIfcePcgZc2J9M",
+        "EXPO_PUBLIC_CLIENT_PAGE_BASE_URL": "https://barber.kevinshibuya.com"
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wftgkhawtihaujbllcmu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmdGdraGF3dGloYXVqYmxsY211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3NTE1OTEsImV4cCI6MjEwODMyNzU5MX0.GJ9KxvoNKLg8EA9Fo9d8cMdNRmQxFFIfcePcgZc2J9M",
+        "EXPO_PUBLIC_CLIENT_PAGE_BASE_URL": "https://barber.kevinshibuya.com"
+      }
+    },
+    "production": {
+      "extends": "base",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://wftgkhawtihaujbllcmu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmdGdraGF3dGloYXVqYmxsY211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3NTE1OTEsImV4cCI6MjEwODMyNzU5MX0.GJ9KxvoNKLg8EA9Fo9d8cMdNRmQxFFIfcePcgZc2J9M",
+        "EXPO_PUBLIC_CLIENT_PAGE_BASE_URL": "https://barber.kevinshibuya.com"
+      }
+    },
+    "base": {
+      "node": "22.18.0",
+      "pnpm": "11.5.2"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
