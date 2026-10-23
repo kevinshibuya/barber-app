@@ -73,6 +73,27 @@ export type Database = {
           },
         ]
       }
+      orphaned_objects: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: number
+          path: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: never
+          path: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: never
+          path?: string
+        }
+        Relationships: []
+      }
       photos: {
         Row: {
           created_at: string
@@ -485,7 +506,12 @@ export type Database = {
         }
       }
       complete_preview: {
-        Args: { id: string; storage_path: string; thumbnail_path: string }
+        Args: {
+          attempt?: number
+          id: string
+          storage_path: string
+          thumbnail_path: string
+        }
         Returns: {
           attempt_count: number
           beard_style_id: string
@@ -515,6 +541,7 @@ export type Database = {
       enqueue_front_previews: { Args: { visit_id: string }; Returns: undefined }
       fail_preview: {
         Args: {
+          attempt?: number
           error: string
           id: string
           retry_at?: string
@@ -608,6 +635,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      visit_object_pattern: {
+        Args: { name: string; shop_id: string; visit_id: string }
+        Returns: string
       }
     }
     Enums: {
