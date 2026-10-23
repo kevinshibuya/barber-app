@@ -33,9 +33,9 @@ import {
 import { strings } from '@/lib/strings';
 import { cn } from '@/lib/utils';
 import { type PhotoSlot, STYLE_DIMENSIONS, type StyleDimension, type Visit } from '@barber/shared';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -108,6 +108,21 @@ export default function PickerScreen() {
       current = false;
     };
   }, [visitId, attempt]);
+
+  // Back on a picker still mounted, as from finish, the visit is read again:
+  // an after photo taken meanwhile locks its look.
+  useFocusEffect(
+    useCallback(() => {
+      let current = true;
+      getVisit(visitId).then(
+        (visit) => current && setData((loaded) => loaded && { ...loaded, visit }),
+        () => undefined,
+      );
+      return () => {
+        current = false;
+      };
+    }, [visitId]),
+  );
 
   useEffect(() => subscribeToPreviews(visitId, setPreviews), [visitId]);
 

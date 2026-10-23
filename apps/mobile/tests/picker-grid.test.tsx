@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { router as navigation } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
 import type { VisitPreview } from '@/api';
@@ -235,6 +236,32 @@ describe('picker grid', () => {
     await fireEvent.press(tile('Topete'));
 
     expect(chooseButton()).toBeDisabled();
+  });
+
+  it('locks the look on a picker gone back to after the after photo was taken', async () => {
+    jest.mocked(api.chooseLook).mockResolvedValue(
+      openVisit({ chosenHairStyleId: 'hair-low-fade', chosenBeardStyleId: 'beard-keep', chosenPreviewId: 'pv-low-fade' }),
+    );
+    const router = await openPicker();
+    await emit([previewOf('low-fade', 'done'), previewOf('quiff', 'done')]);
+    await fireEvent.press(tile('Degradê baixo'));
+    await fireEvent.press(chooseButton());
+    await waitFor(() => expect(router.getPathname()).toBe('/visits/v1/finish'));
+
+    // The after photo is taken on finish, then the barber goes back.
+    jest.mocked(api.getVisit).mockResolvedValue(
+      openVisit({
+        chosenHairStyleId: 'hair-low-fade',
+        chosenBeardStyleId: 'beard-keep',
+        chosenPreviewId: 'pv-low-fade',
+        afterPhotoPath: 's1/v1/after.k1.jpg',
+      }),
+    );
+    await act(async () => navigation.back());
+    await waitFor(() => expect(router.getPathname()).toBe('/visits/v1/picker'));
+    await fireEvent.press(tile('Topete'));
+
+    await waitFor(() => expect(chooseButton()).toBeDisabled());
   });
 
   it('offers again a pair whose chosen preview a retake replaced', async () => {
