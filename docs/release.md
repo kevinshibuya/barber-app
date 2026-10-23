@@ -11,7 +11,7 @@ M1 for demos: one Android phone running the app against a cloud Supabase project
 | HTTPS | the box's shared Caddy, `~/apps/caddy/Caddyfile` | block from `deploy/stack/caddy/site.caddy` |
 | App | EAS project `@kevinshibuya/barber`, `preview` profile, APK | `com.kevinshibuya.barber` |
 
-Local secrets live in `~/.config/barber/` (mode 600, outside the repo): `supabase-token`, `supabase-db-password`, `anon-key`, `service-role-key`. The worker's secrets live only in the box's `~/apps/barber-worker/.env`. The demo logins are in `deploy/provision.local.md` (gitignored).
+Local secrets live in `~/.config/barber/` (mode 600, outside the repo): `supabase-token`, `supabase-db-password`, `anon-key`, `service-role-key`. The worker's secrets live only in the box's `~/apps/barber-worker/.env`. The demo logins are in `~/.config/barber/provision.local.md`.
 
 ## Release steps
 
@@ -34,11 +34,11 @@ Run from the repo root on the Mac. `BOX=ubuntu@<box-ip>`; the IP is in the serve
    ```sh
    supabase projects api-keys --project-ref <ref> -o json   # copy into ~/.config/barber/anon-key and service-role-key
    ```
-6. Auth: site URL and the reset redirect.
+6. Auth: site URL, the reset redirect, and no self sign-up (we create every barber, and the anon key ships in the app).
    ```sh
    curl -X PATCH "https://api.supabase.com/v1/projects/<ref>/config/auth" \
      -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' \
-     -d '{"site_url":"https://barber.kevinshibuya.com","uri_allow_list":"barber://reset-password"}'
+     -d '{"site_url":"https://barber.kevinshibuya.com","uri_allow_list":"barber://reset-password","disable_signup":true}'
    ```
 7. Style images and the demo shop:
    ```sh
@@ -48,7 +48,7 @@ Run from the repo root on the Mac. `BOX=ubuntu@<box-ip>`; the IP is in the serve
      --owner "owner@example.com:Dono Demo" \
      --barber "barber@example.com:Barbeiro Demo" --password <generated>
    ```
-   Write the logins to `deploy/provision.local.md`. Both commands are idempotent.
+   Write the logins to `~/.config/barber/provision.local.md` (mode 600). Both commands are idempotent.
 
 Migrations added later ship with step 4 alone.
 
