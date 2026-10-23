@@ -46,6 +46,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c7dbe639-a270-412f-a738-f69962ec31ad"
+      }
+    },
+    "owner": "kevinshibuya"
   }
 }
