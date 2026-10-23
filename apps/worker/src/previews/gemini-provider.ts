@@ -14,10 +14,13 @@ import {
   retryable,
 } from './provider-http';
 
-// Nano Banana 2.
-export const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image';
+// The Gemini model each provider name runs: `gemini` is Nano Banana 2.
+export const GEMINI_IMAGE_MODELS = {
+  gemini: 'gemini-3.1-flash-image',
+  'nano-banana-2.1': 'gemini-nano-banana-2.1',
+} as const;
 
-const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`;
+export type GeminiProviderName = keyof typeof GEMINI_IMAGE_MODELS;
 
 // Finish reasons that mean the model would not draw this, as opposed to a
 // render that came back empty for no stated reason.
@@ -40,9 +43,14 @@ function inlineImage(parts: unknown): Buffer | undefined {
 }
 
 export class GeminiImageProvider implements ImageProvider {
-  readonly name = 'gemini';
+  private readonly endpoint: string;
 
-  constructor(private readonly options: HttpProviderOptions) {}
+  constructor(
+    private readonly options: HttpProviderOptions,
+    readonly name: GeminiProviderName = 'gemini',
+  ) {
+    this.endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODELS[name]}:generateContent`;
+  }
 
   async render(request: RenderRequest): Promise<RenderResult> {
     const images = [request.base, ...request.references].map((image) => ({
@@ -50,7 +58,7 @@ export class GeminiImageProvider implements ImageProvider {
     }));
     const answer = await postJson(
       this.options,
-      ENDPOINT,
+      this.endpoint,
       { 'x-goog-api-key': this.options.apiKey },
       {
         contents: [{ role: 'user', parts: [...images, { text: editInstruction(request) }] }],

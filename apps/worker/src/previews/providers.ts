@@ -1,7 +1,7 @@
 // The image provider for a configured name, on the key its vendor needs. A
 // key that is not set fails at startup, before the worker claims anything.
 import { type ImageProviderName, WORKER_ENV } from '@barber/shared';
-import { FluxImageProvider, SeedreamImageProvider } from './fal-provider';
+import { FluxImageProvider, FluxKleinImageProvider, SeedreamImageProvider } from './fal-provider';
 import { FakeImageProvider } from './fake-provider';
 import { GeminiImageProvider } from './gemini-provider';
 import type { ImageProvider } from './image-provider';
@@ -17,9 +17,12 @@ export function createImageProvider(name: ImageProviderName, env: NodeJS.Process
     case 'fake':
       return new FakeImageProvider();
     case 'gemini':
-      return new GeminiImageProvider({ apiKey: key(env, WORKER_ENV.geminiApiKey, name) });
+    case 'nano-banana-2.1':
+      return new GeminiImageProvider({ apiKey: key(env, WORKER_ENV.geminiApiKey, name) }, name);
     case 'flux':
       return new FluxImageProvider({ apiKey: key(env, WORKER_ENV.falKey, name) });
+    case 'flux-klein':
+      return new FluxKleinImageProvider({ apiKey: key(env, WORKER_ENV.falKey, name) });
     case 'seedream':
       return new SeedreamImageProvider({ apiKey: key(env, WORKER_ENV.falKey, name) });
   }
