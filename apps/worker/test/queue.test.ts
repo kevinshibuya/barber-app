@@ -342,8 +342,8 @@ describe('the worker\'s configuration', () => {
     );
   });
 
-  it('reads the concurrency and the stale timeout, 6 and 300 seconds unless set, and gemini by default', () => {
-    expect(readPreviewWorkerConfig({})).toEqual({ provider: 'gemini', concurrency: 6, staleAfterSeconds: 300 });
+  it('reads the concurrency and the stale timeout, 6 and 300 seconds unless set, and Nano Banana 2.1 by default', () => {
+    expect(readPreviewWorkerConfig({})).toEqual({ provider: 'nano-banana-2.1', concurrency: 6, staleAfterSeconds: 300 });
     expect(
       readPreviewWorkerConfig({ IMAGE_PROVIDER: 'fake', PREVIEW_CONCURRENCY: '2', PREVIEW_STALE_TIMEOUT_SECONDS: '60' }),
     ).toEqual({ provider: 'fake', concurrency: 2, staleAfterSeconds: 60 });
