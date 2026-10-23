@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { KEEP_STYLE_SLUG, originalPhotoPath, SHARE_LINK_DAYS, SHARE_TOKEN_LENGTH, styleReferencePath } from '../src';
+import { afterPhotoPath, KEEP_STYLE_SLUG, originalPhotoPath, SHARE_LINK_DAYS, SHARE_TOKEN_LENGTH, styleReferencePath } from '../src';
 import { barber, createTestShop, deleteTestShop, must, serviceClient, type TestShop } from './support/supabase';
 
 const service = serviceClient();
@@ -197,6 +197,44 @@ describe('shop isolation', () => {
     expect(must(intruders)).toEqual([]);
   });
 
+  // The worker and the client page read these paths with the service role, so
+  // a path into another shop would hand its photos over.
+  it('refuses a photo or after photo path outside the barber\'s own visit', async () => {
+    const theirs = await seedVisit(otherShop);
+    const ours = await seedVisit(shop);
+    const { db } = barber(shop, 'barber');
+
+    const forgedPhoto = await db
+      .from('photos')
+      .upsert(
+        {
+          visit_id: ours.visit.id,
+          slot: 'front',
+          storage_path: theirs.photo.storage_path,
+          width: 1,
+          height: 1,
+          upload_status: 'uploaded',
+        },
+        { onConflict: 'visit_id,slot' },
+      );
+    expect(forgedPhoto.error?.code).toBe('23514');
+    const otherSlot = await db
+      .from('photos')
+      .update({ storage_path: originalPhotoPath(shop.id, ours.visit.id, 'back') })
+      .eq('id', ours.photo.id);
+    expect(otherSlot.error?.code).toBe('23514');
+    const forgedAfter = await db
+      .from('visits')
+      .update({ after_photo_path: afterPhotoPath(otherShop.id, theirs.visit.id) })
+      .eq('id', ours.visit.id);
+    expect(forgedAfter.error?.code).toBe('23514');
+
+    const retake = originalPhotoPath(shop.id, ours.visit.id, 'front', 'k3x');
+    const after = afterPhotoPath(shop.id, ours.visit.id, 'k3x');
+    must(await db.from('photos').update({ storage_path: retake }).eq('id', ours.photo.id).select().single());
+    must(await db.from('visits').update({ after_photo_path: after }).eq('id', ours.visit.id).select().single());
+  });
+
   it('refuses a barber\'s writes to the catalog', async () => {
     const { db } = barber(shop, 'owner');
     const before = must(
@@ -285,7 +323,13 @@ describe('a new visit', () => {
       await db
         .from('photos')
         .upsert(
-          { visit_id: visit.id, slot: 'front', storage_path: `${path}?take=1`, width: 768, height: 1024 },
+          {
+            visit_id: visit.id,
+            slot: 'front',
+            storage_path: originalPhotoPath(shop.id, visit.id, 'front', '1'),
+            width: 768,
+            height: 1024,
+          },
           { onConflict: 'visit_id,slot' },
         )
         .select()
