@@ -1,3 +1,4 @@
+import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { Screen } from '@/components/screen';
 import { VisitRow } from '@/components/visit-row';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import {
   listRecentVisits,
   searchClients,
   signOut,
+  syncClients,
 } from '@/api';
 import { strings } from '@/lib/strings';
 import type { Client } from '@barber/shared';
@@ -21,7 +23,8 @@ import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 const MIN_QUERY_LENGTH = 2;
 const SEARCH_DELAY_MS = 200;
 
-// The clients matching the query; a result is shown only for the query it answers.
+// The clients matching the query, those on the device first; a result is
+// shown only for the query it answers.
 function useClientSearch(query: string) {
   const needle = query.trim();
   const [result, setResult] = useState<{ needle: string; clients: Client[] | null } | null>(null);
@@ -30,7 +33,8 @@ function useClientSearch(query: string) {
     if (needle.length < MIN_QUERY_LENGTH) return;
     let current = true;
     const timer = setTimeout(() => {
-      searchClients(needle).then(
+      const show = (clients: Client[]) => current && setResult({ needle, clients });
+      searchClients(needle, show).then(
         (clients) => current && setResult({ needle, clients }),
         () => current && setResult({ needle, clients: null }),
       );
@@ -49,31 +53,33 @@ function useClientSearch(query: string) {
   };
 }
 
-// Today's open visits, to resume, and the shop's recent visits without them.
+// Today's open visits, to resume, and the shop's recent visits without them,
+// those on the device first. With no connection the recent visits stay and
+// the open ones are left out.
 function useHomeVisits() {
-  const [visits, setVisits] = useState<VisitSummary[] | null>(null);
+  const [recent, setRecent] = useState<VisitSummary[] | null>(null);
   const [openToday, setOpenToday] = useState<VisitSummary[]>([]);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const [recent, open] = await Promise.all([listRecentVisits(), listOpenVisitsToday()]);
-      const openIds = new Set(open.map((visit) => visit.id));
-      setOpenToday(open);
-      setVisits(recent.filter((visit) => !openIds.has(visit.id)));
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
+    const [fresh, open] = await Promise.allSettled([listRecentVisits(setRecent), listOpenVisitsToday()]);
+    if (fresh.status === 'fulfilled') setRecent(fresh.value);
+    setOpenToday(open.status === 'fulfilled' ? open.value : []);
+    setFailed(fresh.status === 'rejected');
   }, []);
 
-  // Reloaded each time home comes back into view, so a visit just closed shows.
+  // Reloaded each time home comes back into view, so a visit just closed shows,
+  // and the client list on the device brought up to date for search.
   useFocusEffect(
     useCallback(() => {
       void load();
+      void syncClients();
     }, [load]),
   );
+
+  const openIds = new Set(openToday.map((visit) => visit.id));
+  const visits = recent?.filter((visit) => !openIds.has(visit.id)) ?? null;
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -159,6 +165,7 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <View className="gap-2 pb-2">
               <View className="flex-row items-center justify-end">
+                <ConnectivityIndicator className="mr-auto" />
                 {isOwner && (
                   <Button variant="ghost" size="sm" onPress={() => router.push('/dashboard')}>
                     <Text>{strings.dashboard.open}</Text>

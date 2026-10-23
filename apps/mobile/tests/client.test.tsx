@@ -26,7 +26,7 @@ describe('clients', () => {
     expect(await screen.findByText(strings.client.noVisits)).toBeOnTheScreen();
     expect(screen.getByText('Caio Prado')).toBeOnTheScreen();
     expect(screen.getByText(strings.client.noPhone)).toBeOnTheScreen();
-    expect(api.getClient).toHaveBeenCalledWith('c9');
+    expect(api.getClient).toHaveBeenCalledWith('c9', expect.any(Function));
   });
 
   it('does not create a client without a name', async () => {
@@ -66,7 +66,7 @@ describe('clients', () => {
     const oldest = within(screen.getByLabelText('12/08/2026'));
     expect(oldest.getByText('com Rafa')).toBeOnTheScreen();
     expect(oldest.queryByLabelText(strings.visit.look)).not.toBeOnTheScreen();
-    expect(api.listClientVisits).toHaveBeenCalledWith('c1');
+    expect(api.listClientVisits).toHaveBeenCalledWith('c1', expect.any(Function));
   });
 
   it('starts a new visit at its consent screen', async () => {

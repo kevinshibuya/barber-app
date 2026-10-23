@@ -93,7 +93,7 @@ async function toSummaries(rows: SummaryRow[]): Promise<VisitSummary[]> {
 }
 
 // The shop's latest visits, newest first.
-export async function listRecentVisits(): Promise<VisitSummary[]> {
+export async function fetchRecentVisits(): Promise<VisitSummary[]> {
   const { data, error } = await summaryQuery().limit(RECENT_VISITS_LIMIT);
   if (error) throw error;
   return toSummaries(data);
@@ -109,7 +109,7 @@ export async function listOpenVisitsToday(): Promise<VisitSummary[]> {
 }
 
 // A client's visits, newest first.
-export async function listClientVisits(clientId: string): Promise<VisitSummary[]> {
+export async function fetchClientVisits(clientId: string): Promise<VisitSummary[]> {
   const { data, error } = await summaryQuery().eq('client_id', clientId);
   if (error) throw error;
   return toSummaries(data);
