@@ -110,7 +110,7 @@ Photos for the gallery slot go in with `adb push <photo> /sdcard/Pictures/` and 
 
 ## Emulator walkthrough, 2026-10-23
 
-Build `8f504615…` then `f833c4f2…` (APK from `preview`), against the cloud project and the deployed worker, signed in as the demo owner. Screenshots in `screenshots/`.
+EAS builds `85201e0c…` (build 4) then `f833c4f2…` (build 5) (APK from `preview`), against the cloud project and the deployed worker, signed in as the demo owner. Screenshots in `screenshots/`.
 
 | Step | Result | Screenshot |
 |---|---|---|
