@@ -96,7 +96,9 @@ describe('the Gemini provider', () => {
   it.each([
     ['a rate limit', json(429, { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } })],
     ['a server error', json(503, { error: { code: 503, status: 'UNAVAILABLE', message: 'The model is overloaded' } })],
-    ['an answer with no image', json(200, { candidates: [{ content: { parts: [{ text: 'Sure!' }] }, finishReason: 'STOP' }] })],
+    ['an answer with nothing in it', json(200, { candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] })],
+    ['a text answer cut short', json(200, { candidates: [{ content: { parts: [{ text: 'Here is' }] }, finishReason: 'MAX_TOKENS' }] })],
+    ['a text answer whose image failed', json(200, { candidates: [{ content: { parts: [{ text: 'Here is the photo:' }] }, finishReason: 'IMAGE_OTHER' }] })],
   ])('maps %s to a retryable failure', async (_case, response) => {
     const http = transport(response);
     const result = await new GeminiImageProvider({ apiKey: 'k', fetch: http.fetch }).render(request);
@@ -110,6 +112,23 @@ describe('the Gemini provider', () => {
     const http = transport(response);
     const result = await new GeminiImageProvider({ apiKey: 'k', fetch: http.fetch }).render(request);
     expect(result).toMatchObject({ ok: false, failure: 'refused' });
+  });
+
+  // Image models decline in words and stop normally; retrying bills the same
+  // decline twice more.
+  it('maps an answer in text only to a refusal that quotes it', async () => {
+    const decline = "I can't edit photos of real people in this way.";
+    const http = transport(json(200, { candidates: [{ content: { parts: [{ text: decline }] }, finishReason: 'STOP' }] }));
+    const result = await new GeminiImageProvider({ apiKey: 'k', fetch: http.fetch }).render(request);
+    expect(result).toEqual({ ok: false, failure: 'refused', message: `gemini: declined in text: ${decline}` });
+  });
+
+  // A lone surrogate is invalid JSON to Postgres, so the cut keeps whole characters.
+  it('quotes a long decline up to 200 characters without splitting one', async () => {
+    const decline = `${'x'.repeat(199)}😀 and more`;
+    const http = transport(json(200, { candidates: [{ content: { parts: [{ text: decline }] }, finishReason: 'STOP' }] }));
+    const result = await new GeminiImageProvider({ apiKey: 'k', fetch: http.fetch }).render(request);
+    expect(result).toEqual({ ok: false, failure: 'refused', message: `gemini: declined in text: ${'x'.repeat(199)}😀` });
   });
 
   it('maps a transport error to a retryable failure', async () => {

@@ -37,7 +37,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // The header's scrim, darkest at the top edge, so its white text reads on any photo.
 const HEADER_SCRIM = { backgroundImage: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent)' };
@@ -75,6 +75,7 @@ export default function PickerScreen() {
   const router = useRouter();
   const { id: visitId } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<PickerData | null>(null);
   const [failed, setFailed] = useState(false);
   const [previews, setPreviews] = useState<VisitPreview[]>([]);
@@ -337,7 +338,12 @@ export default function PickerScreen() {
             );
           })}
         </View>
-        <ScrollView contentContainerStyle={{ padding: GRID_PADDING, gap: GRID_GAP }} contentContainerClassName="flex-row flex-wrap">
+        {/* The tiles scroll under the navigation bar; the last row scrolls clear of it. */}
+        <ScrollView
+          testID="picker-grid"
+          contentContainerStyle={{ padding: GRID_PADDING, paddingBottom: GRID_PADDING + insets.bottom, gap: GRID_GAP }}
+          contentContainerClassName="flex-row flex-wrap"
+        >
           {tilesFor(tab, catalog, previews, frontPhotoUrl).map((tile) => (
             <PickerTile
               key={tile.style.id}
