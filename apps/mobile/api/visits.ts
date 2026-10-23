@@ -1,4 +1,5 @@
 import {
+  KEEP_STYLE_SLUG,
   previewImagePath,
   previewThumbnailPath,
   STORAGE_BUCKETS,
@@ -203,6 +204,12 @@ async function lookObject(visit: Visit): Promise<{ bucket: StorageBucket; path: 
     return { bucket: STORAGE_BUCKETS.previews, path: previewImagePath(visit.shopId, visit.id, visit.chosenPreviewId) };
   }
   if (!visit.chosenHairStyleId || !visit.chosenBeardStyleId) return null;
+  const pair = await supabase()
+    .from('styles')
+    .select('slug')
+    .in('id', [visit.chosenHairStyleId, visit.chosenBeardStyleId]);
+  if (pair.error) throw pair.error;
+  if (pair.data.length !== 2 || pair.data.some((style) => style.slug !== KEEP_STYLE_SLUG)) return null;
   const { data, error } = await supabase()
     .from('photos')
     .select('storage_path')

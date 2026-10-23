@@ -60,18 +60,21 @@ export function LookStatus({
 export function ChoosePill({
   look,
   chosen,
+  locked,
   saving,
   onChoose,
 }: {
   look: LookPreview;
   chosen: boolean;
+  // The visit's look can no longer change.
+  locked: boolean;
   saving: boolean;
   onChoose: (look: LookPreview) => void;
 }) {
   return (
     <Button
       className="rounded-full px-6"
-      disabled={look.status !== 'done' || chosen || saving}
+      disabled={look.status !== 'done' || chosen || locked || saving}
       onPress={() => onChoose(look)}
     >
       <Text className="font-bold">{chosen ? strings.picker.chosen : strings.picker.choose}</Text>

@@ -201,7 +201,14 @@ export default function PickerScreen() {
 
   const { visit, catalog, frontPhotoUrl } = data;
   const look = front!;
-  const chosen = visit.chosenHairStyleId === selection.hair && visit.chosenBeardStyleId === selection.beard;
+  // A recorded look has its preview, unless it is keep with keep, which has none.
+  const keepBoth = selection.hair === catalog.keep.hair.id && selection.beard === catalog.keep.beard.id;
+  const chosen =
+    visit.chosenHairStyleId === selection.hair &&
+    visit.chosenBeardStyleId === selection.beard &&
+    (keepBoth || visit.chosenPreviewId !== null);
+  // Once the after photo is taken, or the visit closed, the look is the record.
+  const locked = visit.afterPhotoPath !== null || visit.status === 'closed';
   const tileWidth = (width - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
 
   async function choose(chosenLook: LookPreview) {
@@ -230,7 +237,13 @@ export default function PickerScreen() {
   }
 
   const pill = (shownLook: LookPreview) => (
-    <ChoosePill look={shownLook} chosen={chosen} saving={saving} onChoose={(picked) => void choose(picked)} />
+    <ChoosePill
+      look={shownLook}
+      chosen={chosen}
+      locked={locked}
+      saving={saving}
+      onChoose={(picked) => void choose(picked)}
+    />
   );
 
   return (

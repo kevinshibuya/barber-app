@@ -35,6 +35,8 @@ beforeEach(() => {
     pairPreview(hairStyleId.replace('hair-', ''), beardStyleId.replace('beard-', ''), 'pending', { slot }),
   );
   jest.mocked(api.chooseLook).mockResolvedValue(openVisit());
+  // Choosing goes on to the finish screen, which reads the visit again.
+  jest.mocked(api.getVisitDetail).mockResolvedValue({ visit: openVisit(), lookImageUrl: null, afterPhotoUrl: null });
 });
 
 async function openPicker() {

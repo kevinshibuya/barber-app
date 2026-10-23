@@ -22,6 +22,8 @@ beforeEach(() => {
   jest.mocked(api.getClient).mockResolvedValue(client());
   jest.mocked(api.listStyles).mockResolvedValue(CATALOG);
   jest.mocked(api.listVisitPhotos).mockResolvedValue([uploadedPhoto({ url: FRONT_URL })]);
+  // Choosing goes on to the finish screen, which reads the visit again.
+  jest.mocked(api.getVisitDetail).mockResolvedValue({ visit: openVisit(), lookImageUrl: null, afterPhotoUrl: null });
   jest.mocked(api.subscribeToPreviews).mockImplementation((_visitId, onChange) => {
     emit = async (previews) => {
       await act(async () => onChange(previews));
@@ -216,6 +218,51 @@ describe('picker grid', () => {
       beardStyleId: 'beard-keep',
       previewId: 'pv-quiff',
     });
+  });
+
+  it('keeps the look once the after photo is taken', async () => {
+    jest.mocked(api.getVisit).mockResolvedValue(
+      openVisit({
+        chosenHairStyleId: 'hair-buzz-cut',
+        chosenBeardStyleId: 'beard-keep',
+        chosenPreviewId: 'pv-buzz-cut',
+        afterPhotoPath: 's1/v1/after.jpg',
+      }),
+    );
+    await openPicker();
+    await emit([previewOf('buzz-cut', 'done'), previewOf('quiff', 'done')]);
+
+    await fireEvent.press(tile('Topete'));
+
+    expect(chooseButton()).toBeDisabled();
+  });
+
+  it('offers again a pair whose chosen preview a retake replaced', async () => {
+    jest
+      .mocked(api.getVisit)
+      .mockResolvedValue(openVisit({ chosenHairStyleId: 'hair-buzz-cut', chosenBeardStyleId: 'beard-keep' }));
+    await openPicker();
+    await emit([previewOf('buzz-cut', 'done')]);
+
+    expect(tile('Máquina')).toBeSelected();
+    expect(screen.queryByRole('button', { name: strings.picker.chosen })).toBeNull();
+    expect(chooseButton()).toBeEnabled();
+  });
+
+  it('shows a preview the cleanup purged as unavailable, and never chooses it', async () => {
+    await openPicker();
+    const purged: VisitPreview = {
+      ...previewOf('quiff', 'done'),
+      purgedAt: '2026-10-01T06:00:00.000Z',
+      storagePath: null,
+      thumbnailPath: null,
+      thumbnailUrl: null,
+      imageUrl: null,
+    };
+    await emit([purged]);
+
+    expect(within(tile('Topete')).getByText(strings.picker.tile.refused)).toBeOnTheScreen();
+    expect(tile('Topete')).toBeDisabled();
   });
 
   it('says so when the choice cannot be saved, and stays on the picker', async () => {
