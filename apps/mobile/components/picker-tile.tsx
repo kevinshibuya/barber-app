@@ -37,7 +37,8 @@ export function PickerTile({
       accessibilityState={{ selected, disabled: refused }}
       disabled={refused}
       onPress={onPress}
-      style={{ width, aspectRatio: 2 / 3 }}
+      // An explicit height: Android's release build drops aspectRatio beside a className.
+      style={{ width, height: width * 1.5 }}
       className={cn('bg-muted overflow-hidden rounded-xl border-[3px]', selected ? 'border-primary' : 'border-transparent')}
     >
       {tile.imageUrl && (
