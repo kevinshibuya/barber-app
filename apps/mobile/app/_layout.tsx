@@ -1,6 +1,6 @@
 import '@/global.css';
 
-import { resumeUploads } from '@/api';
+import { resumeUploads, watchSession } from '@/api';
 import { NAV_THEME } from '@/lib/theme';
 import { PortalHost } from '@rn-primitives/portal';
 import { Stack } from 'expo-router';
@@ -18,6 +18,7 @@ export default function RootLayout() {
   const { colorScheme } = useColorScheme();
   // Uploads a closed or crashed app still owed go out from launch.
   useEffect(() => resumeUploads(), []);
+  useEffect(() => watchSession(), []);
 
   return (
     <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>

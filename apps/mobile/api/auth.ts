@@ -1,6 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type Barber, isBarberRole } from '@barber/shared';
-import { isAuthApiError, isAuthPKCECodeVerifierMissingError } from '@supabase/supabase-js';
+import { isAuthApiError, isAuthPKCECodeVerifierMissingError, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
+import type { Unsubscribe } from './previews';
 import { clearReadCache } from './reads';
 import { supabase } from './supabase';
 
@@ -15,6 +17,30 @@ export type SignInResult =
 export type SetNewPasswordResult =
   | { ok: true; barber: Barber }
   | { ok: false; reason: 'weak-password' | 'same-password' };
+
+// The barber last signed in on this device, kept so the app opens on its
+// cache with no connection. The device's copy of the shop is that barber's:
+// anyone else signing in starts it empty.
+export const BARBER_STORAGE_KEY = 'barber.signed-in';
+
+async function knownBarber(): Promise<Barber | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BARBER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Barber) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function remember(barber: Barber): Promise<void> {
+  const previous = await knownBarber();
+  if (previous?.id !== barber.id) await clearReadCache();
+  await AsyncStorage.setItem(BARBER_STORAGE_KEY, JSON.stringify(barber)).catch(() => undefined);
+}
+
+async function forget(): Promise<void> {
+  await Promise.all([clearReadCache(), AsyncStorage.removeItem(BARBER_STORAGE_KEY).catch(() => undefined)]);
+}
 
 async function fetchBarber(userId: string): Promise<Barber | null> {
   const { data, error } = await supabase()
@@ -42,23 +68,45 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     await supabase().auth.signOut();
     return { ok: false, reason: 'not-a-barber' };
   }
+  await remember(barber);
   return { ok: true, barber };
 }
 
 // The device's copy of the shop goes first, so it is gone even when the
 // network refuses the sign-out.
 export async function signOut(): Promise<void> {
-  await clearReadCache();
+  await forget();
   const { error } = await supabase().auth.signOut();
   if (error) throw error;
 }
 
 // The barber of the persisted session, or null when nobody is signed in.
+// With no connection, a session this device still holds opens as the barber
+// it last signed in, so the screens read their cache.
 export async function getCurrentBarber(): Promise<Barber | null> {
   const { data, error } = await supabase().auth.getSession();
-  if (error) throw error;
-  if (!data.session) return null;
-  return fetchBarber(data.session.user.id);
+  if (error && !isAuthRetryableFetchError(error)) throw error;
+  const userId = data.session?.user.id;
+  if (!userId && !error) return null;
+  try {
+    if (!userId) throw error;
+    const barber = await fetchBarber(userId);
+    if (barber) await remember(barber);
+    return barber;
+  } catch (failure) {
+    const known = await knownBarber();
+    if (known && (!userId || known.id === userId)) return known;
+    throw failure;
+  }
+}
+
+// A session that ends without the sign-out button, revoked or replaced, takes
+// the device's copy of the shop with it. The root layout calls it once.
+export function watchSession(): Unsubscribe {
+  const { data } = supabase().auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') void forget();
+  });
+  return () => data.subscription.unsubscribe();
 }
 
 // Emails a reset link that opens the app's set-new-password screen. Supabase
@@ -89,5 +137,6 @@ export async function setNewPassword(password: string): Promise<SetNewPasswordRe
   if (error) throw error;
   const barber = await fetchBarber(data.user.id);
   if (!barber) throw new Error(`user ${data.user.id} is not a barber of any shop`);
+  await remember(barber);
   return { ok: true, barber };
 }
