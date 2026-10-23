@@ -1,6 +1,7 @@
 import { type Barber, isBarberRole } from '@barber/shared';
 import { isAuthApiError, isAuthPKCECodeVerifierMissingError } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
+import { clearReadCache } from './reads';
 import { supabase } from './supabase';
 
 // The screen the password reset email's link opens, through the `barber`
@@ -44,7 +45,10 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   return { ok: true, barber };
 }
 
+// The device's copy of the shop goes first, so it is gone even when the
+// network refuses the sign-out.
 export async function signOut(): Promise<void> {
+  await clearReadCache();
   const { error } = await supabase().auth.signOut();
   if (error) throw error;
 }

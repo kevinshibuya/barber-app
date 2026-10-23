@@ -98,12 +98,23 @@ export const strings = {
     slots: { front: 'Frente', left: 'Esquerda', right: 'Direita', back: 'Trás' },
     required: 'Obrigatória',
     optional: 'Opcional',
-    status: { empty: 'Sem foto', uploading: 'Enviando…', uploaded: 'Enviada', failed: 'Falha no envio' },
+    status: {
+      empty: 'Sem foto',
+      uploading: 'Enviando…',
+      waiting: 'Aguardando conexão',
+      uploaded: 'Enviada',
+      failed: 'Falha no envio',
+    },
     camera: 'Câmera',
     gallery: 'Galeria',
     retry: 'Tentar de novo',
     cameraDenied: 'Permita o acesso à câmera nas configurações do celular.',
     continue: 'Continuar',
+  },
+  connectivity: {
+    offline: 'Sem conexão',
+    waiting: (count: number) => `Sem conexão · ${count} ${count === 1 ? 'envio' : 'envios'} na fila`,
+    sending: (count: number) => `Enviando ${count} ${count === 1 ? 'item' : 'itens'}…`,
   },
   // Keys and copy from docs/design/picker-references.md.
   picker: {

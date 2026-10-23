@@ -1,7 +1,8 @@
-import type { Photo, PhotoSlot } from '@barber/shared';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import type { PhotoSlot } from '@barber/shared';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
+import type { DeliveryStatus, PhotoUpload, SlotUploads } from '@/api';
 import { type PickResult, pickPhoto } from '@/lib/pick-photo';
 import { strings } from '@/lib/strings';
 import { client, keepStyle, openVisit, rafa, uploadedPhoto, visit } from './support/fixtures';
@@ -13,18 +14,6 @@ function picked(name: string): PickResult {
   return { status: 'picked', image: { uri: `file:///camera/${name}.jpg`, width: 3024, height: 4032 } };
 }
 
-function photo(slot: PhotoSlot): Photo {
-  return {
-    id: `p-${slot}`,
-    visitId: 'v1',
-    slot,
-    storagePath: `s1/v1/${slot}.jpg`,
-    width: 768,
-    height: 1024,
-    uploadStatus: 'uploaded',
-  };
-}
-
 function slot(name: PhotoSlot) {
   return within(screen.getByLabelText(strings.photos.slots[name]));
 }
@@ -33,15 +22,32 @@ function continueButton() {
   return screen.getByRole('button', { name: strings.photos.continue });
 }
 
+// The scripted upload queue: what it holds for the visit, reported to the
+// slots screen's subscription.
+let uploads: SlotUploads = {};
+let onUploads: (slots: SlotUploads) => void = () => undefined;
+
+function queued(shot: PhotoUpload, status: DeliveryStatus) {
+  const { uri, width, height } = shot;
+  uploads = { ...uploads, [shot.slot]: { status, image: { uri, width, height }, upload: { kind: 'photo', shot, take: 't' } } };
+  onUploads(uploads);
+}
+
 beforeEach(() => {
+  uploads = {};
   jest.mocked(pickPhoto).mockReset();
   jest.mocked(api.listVisitPhotos).mockResolvedValue([]);
+  jest.mocked(api.subscribeToUploads).mockImplementation((_visitId, onChange) => {
+    onUploads = onChange;
+    return () => undefined;
+  });
+  // The queue sends every shot at once.
+  jest.mocked(api.uploadPhoto).mockImplementation(async (shot) => queued(shot, 'sent'));
 });
 
 describe('photo slots', () => {
   it('uploads the front shot for slot front and continues only once it is uploaded', async () => {
-    let finish: (photo: Photo) => void = () => undefined;
-    jest.mocked(api.uploadPhoto).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    jest.mocked(api.uploadPhoto).mockImplementation(async (shot) => queued(shot, 'sending'));
     jest.mocked(pickPhoto).mockResolvedValue(picked('front'));
     await renderRouter('./app', { initialUrl: '/visits/v1/photos' });
 
@@ -64,14 +70,13 @@ describe('photo slots', () => {
     expect(await slot('front').findByText(strings.photos.status.uploading)).toBeOnTheScreen();
     expect(continueButton()).toBeDisabled();
 
-    finish(photo('front'));
+    await act(async () => queued(jest.mocked(api.uploadPhoto).mock.calls[0]![0], 'sent'));
 
     expect(await slot('front').findByText(strings.photos.status.uploaded)).toBeOnTheScreen();
     await waitFor(() => expect(continueButton()).toBeEnabled());
   });
 
   it('uploads a retake for the same slot again', async () => {
-    jest.mocked(api.uploadPhoto).mockResolvedValue(photo('front'));
     jest.mocked(pickPhoto).mockResolvedValueOnce(picked('first')).mockResolvedValueOnce(picked('retake'));
     await renderRouter('./app', { initialUrl: '/visits/v1/photos' });
 
@@ -88,7 +93,6 @@ describe('photo slots', () => {
   });
 
   it('keeps continue disabled while only an optional slot is filled', async () => {
-    jest.mocked(api.uploadPhoto).mockResolvedValue(photo('left'));
     jest.mocked(pickPhoto).mockResolvedValue(picked('left'));
     await renderRouter('./app', { initialUrl: '/visits/v1/photos' });
 
@@ -99,8 +103,8 @@ describe('photo slots', () => {
     expect(continueButton()).toBeDisabled();
   });
 
-  it('shows a failed upload with a retry that uploads the same shot again', async () => {
-    jest.mocked(api.uploadPhoto).mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce(photo('front'));
+  it('shows a shot that could not be queued as failed, with a retry that queues the same shot again', async () => {
+    jest.mocked(api.uploadPhoto).mockRejectedValueOnce(new Error('storage full'));
     jest.mocked(pickPhoto).mockResolvedValue(picked('front'));
     await renderRouter('./app', { initialUrl: '/visits/v1/photos' });
 

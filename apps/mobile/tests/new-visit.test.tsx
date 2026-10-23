@@ -2,7 +2,6 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
 import { strings } from '@/lib/strings';
-import { openVisit } from './support/fixtures';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -20,8 +19,8 @@ describe('new visit', () => {
     expect(api.startVisit).not.toHaveBeenCalled();
   });
 
-  it('creates the visit with consent and a device-generated id once consent is ticked, then opens the slots', async () => {
-    jest.mocked(api.startVisit).mockImplementation(async ({ id }) => openVisit({ id }));
+  it('queues the visit with consent and a device-generated id once consent is ticked, then opens the slots', async () => {
+    jest.mocked(api.startVisit).mockResolvedValue(undefined);
     const router = await renderRouter('./app', { initialUrl: '/clients/c1/new-visit' });
 
     await fireEvent.press(await screen.findByRole('checkbox', { name: strings.newVisit.consent }));
@@ -39,7 +38,7 @@ describe('new visit', () => {
     expect(router.getPathname()).toBe(`/visits/${visitId}/photos`);
   });
 
-  it('unticks consent and keeps the camera closed when the visit cannot be created', async () => {
+  it('unticks consent and keeps the camera closed when the visit cannot be queued', async () => {
     jest.mocked(api.startVisit).mockRejectedValue(new Error('network down'));
     await renderRouter('./app', { initialUrl: '/clients/c1/new-visit' });
 
