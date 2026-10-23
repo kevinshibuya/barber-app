@@ -87,6 +87,27 @@ describe('unchosen previews', () => {
   });
 });
 
+describe('objects a retake orphaned', () => {
+  it('are removed from storage and forgotten', async () => {
+    const { done } = await seedClientPageVisit(service, shop, { done: [{ hair: 'low-fade', beard: 'keep' }] });
+    const [row] = done;
+    if (!row) throw new Error('expected a done preview');
+    const paths = [row.storage_path!, row.thumbnail_path!];
+    must(
+      await service
+        .from('orphaned_objects')
+        .insert(paths.map((path) => ({ bucket: STORAGE_BUCKETS.previews, path })))
+        .select(),
+    );
+
+    const counts = await runCleanup({ db: service, log: () => undefined });
+
+    for (const path of paths) expect(await exists(STORAGE_BUCKETS.previews, path)).toBe(false);
+    expect(must(await service.from('orphaned_objects').select('id').in('path', paths))).toEqual([]);
+    expect(counts.orphansRemoved).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('share links', () => {
   it('lose their token once past expiry, so the page is 404; a live link keeps it', async () => {
     const expired = await seedClientPageVisit(service, shop);

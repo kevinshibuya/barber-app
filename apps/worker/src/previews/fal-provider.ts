@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import type { ImageProviderName } from '@barber/shared';
 import type { ImageProvider, RenderRequest, RenderResult } from './image-provider';
 import {
+  DEFAULT_TIMEOUT_MS,
   editInstruction,
   type Failed,
   type HttpProviderOptions,
@@ -37,7 +38,9 @@ async function download(options: HttpProviderOptions, url: string): Promise<Buff
   const dataPrefix = /^data:[^;,]*;base64,/.exec(url);
   if (dataPrefix) return Buffer.from(url.slice(dataPrefix[0].length), 'base64');
   try {
-    const response = await (options.fetch ?? fetch)(url);
+    const response = await (options.fetch ?? fetch)(url, {
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+    });
     if (!response.ok) return httpFailure(response.status, `download of ${url}`);
     return Buffer.from(await response.arrayBuffer());
   } catch (error) {

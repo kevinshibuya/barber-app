@@ -16,6 +16,7 @@ import {
   type PreviewRow,
   STORAGE_BUCKETS,
   type Tables,
+  visitObjectPrefix,
 } from '@barber/shared';
 import type { ImageProvider, RenderFailure, RenderRequest, RenderResult } from './image-provider';
 
@@ -167,8 +168,13 @@ export class PreviewWorker {
     try {
       let result: { ok: true; stored: StoredPreview } | Extract<RenderResult, { ok: false }>;
       try {
-        const rendered = await this.provider.render(await this.renderRequest(row));
-        result = rendered.ok ? { ok: true, stored: await this.store(row, rendered.image) } : rendered;
+        const earlier = row.attempt_count > 1 ? await this.storedEarlier(row) : null;
+        if (earlier) {
+          result = { ok: true, stored: earlier };
+        } else {
+          const rendered = await this.provider.render(await this.renderRequest(row));
+          result = rendered.ok ? { ok: true, stored: await this.store(row, rendered.image) } : rendered;
+        }
       } catch (thrown) {
         result = { ok: false, failure: 'retryable', message: errorText(thrown) };
       }
@@ -212,7 +218,7 @@ export class PreviewWorker {
     }
     const settled = check(
       await this.db
-        .rpc('fail_preview', { id: row.id, status, error: message, retry_at: retryAt })
+        .rpc('fail_preview', { id: row.id, status, error: message, retry_at: retryAt, attempt: row.attempt_count })
         .maybeSingle(),
       'fail_preview',
     );
@@ -248,11 +254,13 @@ export class PreviewWorker {
     return { base, references: [reference], prompt: style.prompt };
   }
 
+  // The service role reads any shop's objects, so the photo's path must be
+  // under its own visit.
   private async slotPhoto(row: PreviewRow): Promise<Buffer> {
     const photo = check(
       await this.db
         .from('photos')
-        .select('storage_path')
+        .select('storage_path, visit:visits!inner(shop_id)')
         .eq('visit_id', row.visit_id)
         .eq('slot', row.slot)
         .eq('upload_status', 'uploaded')
@@ -260,6 +268,9 @@ export class PreviewWorker {
       'photos',
     );
     if (!photo) throw new Error(`visit ${row.visit_id} has no uploaded ${row.slot} photo`);
+    if (!photo.storage_path.startsWith(visitObjectPrefix(photo.visit.shop_id, row.visit_id))) {
+      throw new Error(`visit ${row.visit_id}'s ${row.slot} photo is not under the visit`);
+    }
     return this.download(STORAGE_BUCKETS.originals, photo.storage_path);
   }
 
@@ -281,15 +292,35 @@ export class PreviewWorker {
     return this.download(STORAGE_BUCKETS.previews, base.storage_path);
   }
 
-  // Writes the image as a JPEG and its thumbnail at the previews path
-  // convention.
-  private async store(row: PreviewRow, image: Buffer): Promise<StoredPreview> {
+  // Where the row's image and thumbnail go, at the previews path convention.
+  private async destination(row: PreviewRow): Promise<StoredPreview> {
     const visit = present(
       await this.db.from('visits').select('shop_id, provider_name').eq('id', row.visit_id).maybeSingle(),
       `visit ${row.visit_id}`,
     );
-    const imagePath = previewImagePath(visit.shop_id, row.visit_id, row.id);
-    const thumbnailPath = previewThumbnailPath(visit.shop_id, row.visit_id, row.id);
+    return {
+      imagePath: previewImagePath(visit.shop_id, row.visit_id, row.id),
+      thumbnailPath: previewThumbnailPath(visit.shop_id, row.visit_id, row.id),
+      providerRecorded: visit.provider_name !== null,
+    };
+  }
+
+  // An earlier attempt that stored both objects, then failed to settle the
+  // row, left a paid render behind: settle it instead of rendering again.
+  private async storedEarlier(row: PreviewRow): Promise<StoredPreview | null> {
+    const stored = await this.destination(row);
+    const bucket = this.db.storage.from(STORAGE_BUCKETS.previews);
+    const [image, thumbnail] = await Promise.all([
+      bucket.exists(stored.imagePath),
+      bucket.exists(stored.thumbnailPath),
+    ]);
+    return image.data && thumbnail.data ? stored : null;
+  }
+
+  // Writes the image as a JPEG and its thumbnail.
+  private async store(row: PreviewRow, image: Buffer): Promise<StoredPreview> {
+    const stored = await this.destination(row);
+    const { imagePath, thumbnailPath } = stored;
     const [jpeg, thumbnail] = await Promise.all([
       sharp(image).rotate().jpeg({ quality: 90 }).toBuffer(),
       sharp(image)
@@ -302,22 +333,29 @@ export class PreviewWorker {
     const options = { contentType: 'image/jpeg', upsert: true };
     check(await bucket.upload(imagePath, jpeg, options), `upload ${imagePath}`);
     check(await bucket.upload(thumbnailPath, thumbnail, options), `upload ${thumbnailPath}`);
-    return { imagePath, thumbnailPath, providerRecorded: visit.provider_name !== null };
+    return stored;
   }
 
-  // Marks the row done and, on the visit's first completion, records the
-  // provider on the visit. A row deleted or settled meanwhile is dropped: its
-  // objects are removed again.
+  // Marks the row done for this claim and, on the visit's first completion,
+  // records the provider on the visit. A row settled or claimed again
+  // meanwhile is dropped and its objects, at paths the other claim shares,
+  // are left alone; a row deleted meanwhile has its objects removed.
   private async complete(row: PreviewRow, stored: StoredPreview): Promise<PreviewOutcome> {
     const { imagePath, thumbnailPath } = stored;
     const done = check(
       await this.db
-        .rpc('complete_preview', { id: row.id, storage_path: imagePath, thumbnail_path: thumbnailPath })
+        .rpc('complete_preview', {
+          id: row.id,
+          storage_path: imagePath,
+          thumbnail_path: thumbnailPath,
+          attempt: row.attempt_count,
+        })
         .maybeSingle(),
       'complete_preview',
     );
     if (!done) {
-      await this.db.storage.from(STORAGE_BUCKETS.previews).remove([imagePath, thumbnailPath]);
+      const kept = check(await this.db.from('previews').select('id').eq('id', row.id).maybeSingle(), 'preview');
+      if (!kept) await this.db.storage.from(STORAGE_BUCKETS.previews).remove([imagePath, thumbnailPath]);
       return 'dropped';
     }
     if (!stored.providerRecorded) {
