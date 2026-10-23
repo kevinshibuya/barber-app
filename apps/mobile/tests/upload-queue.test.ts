@@ -1,4 +1,11 @@
-import { type QueueStorage, type Upload, type UploadTransport, uploadQueue } from '@/api/upload-queue';
+import {
+  photoKey,
+  type QueueState,
+  type QueueStorage,
+  type Upload,
+  type UploadTransport,
+  uploadQueue,
+} from '@/api/upload-queue';
 
 // Device storage that outlives any one queue, as AsyncStorage outlives the app.
 function fakeStorage(): QueueStorage {
@@ -49,9 +56,18 @@ function fakeTransport() {
   };
 }
 
+// The barber signed in on the device.
+const signedIn = async () => 'b1';
+
 const frontShot: Upload = {
   kind: 'photo',
   shot: { visitId: 'v1', slot: 'front', uri: 'file:///camera/front.jpg', width: 3024, height: 4032 },
+  take: 'take1',
+};
+
+const sideShot: Upload = {
+  kind: 'photo',
+  shot: { visitId: 'v1', slot: 'left', uri: 'file:///camera/left.jpg', width: 3024, height: 4032 },
   take: 'take1',
 };
 
@@ -67,7 +83,7 @@ describe('the upload queue', () => {
   it('delivers an upload that fails twice then succeeds once, waiting longer before each retry', async () => {
     const network = fakeTransport();
     network.failNext(2);
-    const queue = uploadQueue({ storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
+    const queue = uploadQueue({ owner: signedIn, storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
 
     await queue.add(frontShot);
     await settle();
@@ -94,14 +110,14 @@ describe('the upload queue', () => {
     const storage = fakeStorage();
     const network = fakeTransport();
     network.goDown();
-    const killed = uploadQueue({ storage, transport: network.transport });
+    const killed = uploadQueue({ owner: signedIn, storage, transport: network.transport });
     await killed.add(frontShot);
     await settle();
     killed.stop();
     expect(network.received).toEqual([]);
 
     network.comeBack();
-    const restarted = uploadQueue({ storage, transport: network.transport });
+    const restarted = uploadQueue({ owner: signedIn, storage, transport: network.transport });
     const seen: string[] = [];
     restarted.subscribe((state) => {
       const front = state.progress.get('photo:v1:front');
@@ -115,7 +131,7 @@ describe('the upload queue', () => {
 
     // Sent means gone from storage: the next launch sends nothing.
     const next = fakeTransport();
-    const relaunched = uploadQueue({ storage, transport: next.transport });
+    const relaunched = uploadQueue({ owner: signedIn, storage, transport: next.transport });
     await relaunched.start();
     await settle();
     expect(next.attempts).toEqual([]);
@@ -124,7 +140,7 @@ describe('the upload queue', () => {
   it('sends a visit started while the network is down once, with its device id, when the network returns', async () => {
     const network = fakeTransport();
     network.goDown();
-    const queue = uploadQueue({ storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
+    const queue = uploadQueue({ owner: signedIn, storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
     const visit: Upload = {
       kind: 'visit',
       visit: { id: 'device-visit-1', clientId: 'c1', consentGiven: true, consentAt: '2026-10-22T14:00:00.000Z' },
@@ -150,7 +166,7 @@ describe('the upload queue', () => {
   it('reports itself offline while a send is failing, with what it still owes', async () => {
     const network = fakeTransport();
     network.goDown();
-    const queue = uploadQueue({ storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
+    const queue = uploadQueue({ owner: signedIn, storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
     const states: { offline: boolean; pending: number }[] = [];
     queue.subscribe((state) => states.push({ offline: state.offline, pending: state.pending.length }));
 
@@ -167,7 +183,7 @@ describe('the upload queue', () => {
     const storage = fakeStorage();
     await storage.setItem('barber.upload-queue', '{not json');
     const network = fakeTransport();
-    const queue = uploadQueue({ storage, transport: network.transport });
+    const queue = uploadQueue({ owner: signedIn, storage, transport: network.transport });
 
     await queue.start();
     await queue.add(frontShot);
@@ -179,7 +195,7 @@ describe('the upload queue', () => {
   it('replaces a waiting take of a slot with the retake, and sends only the retake', async () => {
     const network = fakeTransport();
     network.goDown();
-    const queue = uploadQueue({ storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
+    const queue = uploadQueue({ owner: signedIn, storage: fakeStorage(), transport: network.transport, baseDelayMs: 1000 });
     const retake: Upload = { ...frontShot, take: 'take2' } as Upload;
 
     await queue.add(frontShot);
@@ -189,5 +205,134 @@ describe('the upload queue', () => {
     await jest.advanceTimersByTimeAsync(30_000);
 
     expect(network.received).toEqual([retake]);
+  });
+
+  it('sets aside an upload the server refuses for good, and sends the ones behind it', async () => {
+    class Refused extends Error {}
+    const received: Upload[] = [];
+    const transport: UploadTransport = {
+      async send(upload) {
+        if (upload === frontShot) throw new Refused('row-level security');
+        received.push(upload);
+      },
+    };
+    const queue = uploadQueue({
+      owner: signedIn,
+      storage: fakeStorage(),
+      transport,
+      isPermanent: (error) => error instanceof Refused,
+    });
+    const states: QueueState[] = [];
+    queue.subscribe((state) => states.push(state));
+
+    const refused = await queue.add(frontShot);
+    const outcome = refused.sent.then(
+      () => 'sent',
+      (error: unknown) => error,
+    );
+    await queue.add(sideShot);
+    await settle();
+
+    expect(received).toEqual([sideShot]);
+    expect(await outcome).toBeInstanceOf(Refused);
+    const last = states.at(-1)!;
+    expect(last.pending).toEqual([]);
+    expect(last.offline).toBe(false);
+    expect(last.progress.get(photoKey('v1', 'front'))?.status).toBe('failed');
+  });
+
+  it('sends an upload only while the barber who made it is signed in', async () => {
+    let me: string | null = 'b1';
+    const network = fakeTransport();
+    network.goDown();
+    const queue = uploadQueue({ owner: async () => me, storage: fakeStorage(), transport: network.transport });
+
+    await queue.add(frontShot);
+    await settle();
+    me = 'b2';
+    network.comeBack();
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(network.received).toEqual([]);
+
+    await queue.add(sideShot);
+    await settle();
+    expect(network.received).toEqual([sideShot]);
+
+    me = 'b1';
+    queue.wake();
+    await settle();
+    expect(network.received).toEqual([sideShot, frontShot]);
+  });
+
+  it('never sends an upload twice when woken while it stores its progress', async () => {
+    const values = new Map<string, string>();
+    let storing: Promise<void> | null = null;
+    let stored = () => undefined as void;
+    const storage: QueueStorage = {
+      async getItem(key) {
+        return values.get(key) ?? null;
+      },
+      async setItem(key, value) {
+        if (storing) await storing;
+        values.set(key, value);
+      },
+    };
+    // The side shot's send is slow, so a second drain would still be sending it.
+    let offline = true;
+    let sideSent = () => undefined as void;
+    const sideSending = new Promise<void>((resolve) => {
+      sideSent = resolve;
+    });
+    const received: Upload[] = [];
+    const transport: UploadTransport = {
+      async send(upload) {
+        if (offline) throw new Error('Network request failed');
+        if (upload === sideShot) await sideSending;
+        received.push(upload);
+      },
+    };
+    const queue = uploadQueue({ owner: signedIn, storage, transport });
+    await queue.add(frontShot);
+    await queue.add(sideShot);
+    await settle();
+
+    storing = new Promise((resolve) => {
+      stored = resolve;
+    });
+    offline = false;
+    queue.wake();
+    await settle();
+    expect(received).toEqual([frontShot]);
+    // Woken again while the first drain waits on storage.
+    queue.wake();
+    await settle();
+    stored();
+    await settle();
+    sideSent();
+    await settle();
+
+    expect(received).toEqual([frontShot, sideShot]);
+  });
+
+  it('rejects an upload storage cannot keep, and leaves the queue as it was', async () => {
+    const storage: QueueStorage = {
+      async getItem() {
+        return null;
+      },
+      async setItem() {
+        throw new Error('disk full');
+      },
+    };
+    const network = fakeTransport();
+    const queue = uploadQueue({ owner: signedIn, storage, transport: network.transport });
+    const states: QueueState[] = [];
+    queue.subscribe((state) => states.push(state));
+
+    await expect(queue.add(frontShot)).rejects.toThrow('disk full');
+    await settle();
+
+    expect(network.received).toEqual([]);
+    expect(states.at(-1)!.pending).toEqual([]);
+    expect(states.at(-1)!.progress.size).toBe(0);
   });
 });
