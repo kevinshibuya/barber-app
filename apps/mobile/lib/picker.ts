@@ -52,8 +52,11 @@ export function previewFor(
   );
 }
 
+// A preview the nightly cleanup purged has no image any more: like a refused
+// one, it shows as unavailable and cannot be chosen.
 function statusOf(preview: VisitPreview | null): TileStatus {
   if (!preview || preview.status === 'pending' || preview.status === 'running') return 'generating';
+  if (preview.purgedAt) return 'refused';
   return preview.status;
 }
 
@@ -114,7 +117,7 @@ export function lookFor(
   if (hairKept && beardKept) return { ...look, status: 'done', imageUrl: photoUrl, previewId: null };
 
   const preview = previewFor(previews, selection.hair, selection.beard, slot);
-  if (preview?.status === 'done') {
+  if (preview?.status === 'done' && !preview.purgedAt) {
     return {
       ...look,
       status: 'done',
@@ -124,7 +127,12 @@ export function lookFor(
     };
   }
 
-  const ended = preview?.status === 'failed' || preview?.status === 'refused' ? preview.status : null;
+  const ended =
+    preview?.status === 'failed' || preview?.status === 'refused'
+      ? preview.status
+      : preview?.purgedAt
+        ? 'refused'
+        : null;
   const shown: StyleDimension = hairKept ? 'beard' : 'hair';
   const reference = catalog[shown].find((style) => style.id === selection[shown])?.referenceImageUrl ?? null;
   let imageUrl = slot === 'front' ? reference : photoUrl;
