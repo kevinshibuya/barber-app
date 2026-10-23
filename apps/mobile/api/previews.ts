@@ -27,6 +27,8 @@ export const PREVIEW_RESUBSCRIBE_MS = 1000;
 const PREVIEW_RESUBSCRIBE_MAX_MS = 30_000;
 // Long enough for the picker to stay open through a cut.
 const SIGNED_URL_SECONDS = 60 * 60;
+// A signed URL is used until this long before it expires, then signed again.
+export const PREVIEW_RESIGN_MS = (SIGNED_URL_SECONDS - 5 * 60) * 1000;
 
 // Everything the previews feed sends over the network.
 export interface PreviewsTransport {
@@ -43,8 +45,11 @@ export interface PreviewsTransport {
 // the channel is unhealthy they are polled instead, and the channel is
 // dropped and subscribed again, after a delay that doubles from
 // `resubscribeMs` up to a ceiling, until one reports healthy and reads once
-// to catch what the gap missed. Each done row's paths are signed once per
-// subscription. `onLink` hears every health report.
+// to catch what the gap missed. A read that fails is tried again after
+// `pollMs` even while the channel is healthy. Each done row's paths are
+// signed once and signed again before the URLs expire, which a read every
+// PREVIEW_RESIGN_MS sees to on a picker left open. `onLink` hears every
+// health report.
 export function previewFeed(
   transport: PreviewsTransport,
   {
@@ -54,9 +59,10 @@ export function previewFeed(
   }: { pollMs?: number; resubscribeMs?: number; onLink?: (up: boolean) => void } = {},
 ) {
   return function subscribe(visitId: string, onChange: (previews: VisitPreview[]) => void): Unsubscribe {
-    const urls = new Map<string, string>();
+    const urls = new Map<string, { url: string; signedAt: number }>();
     let closed = false;
     let poll: ReturnType<typeof setInterval> | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     let resubscribe: ReturnType<typeof setTimeout> | null = null;
     let delay = resubscribeMs;
     let latest = 0;
@@ -68,24 +74,34 @@ export function previewFeed(
       const ticket = ++latest;
       try {
         const previews = await transport.list(visitId);
+        const now = Date.now();
         const unsigned = previews
           .filter((preview) => preview.status === 'done' && !preview.purgedAt)
           .flatMap((preview) => [preview.thumbnailPath, preview.storagePath])
-          .filter((path): path is string => path !== null && !urls.has(path));
+          .filter((path): path is string => {
+            const signed = path === null ? undefined : urls.get(path);
+            return path !== null && (!signed || now - signed.signedAt >= PREVIEW_RESIGN_MS);
+          });
         if (unsigned.length > 0) {
-          for (const [path, url] of await transport.sign(unsigned)) urls.set(path, url);
+          for (const [path, url] of await transport.sign(unsigned)) urls.set(path, { url, signedAt: now });
         }
         // A slower read that started earlier never overwrites a newer one.
         if (closed || ticket !== latest) return;
         onChange(
           previews.map((preview) => ({
             ...preview,
-            thumbnailUrl: preview.thumbnailPath ? (urls.get(preview.thumbnailPath) ?? null) : null,
-            imageUrl: preview.storagePath ? (urls.get(preview.storagePath) ?? null) : null,
+            thumbnailUrl: preview.thumbnailPath ? (urls.get(preview.thumbnailPath)?.url ?? null) : null,
+            imageUrl: preview.storagePath ? (urls.get(preview.storagePath)?.url ?? null) : null,
           })),
         );
       } catch {
-        // The next change or poll reads again.
+        // A poll reads again; with the channel healthy, nothing else may.
+        if (!closed && !poll) {
+          retry ??= setTimeout(() => {
+            retry = null;
+            void read();
+          }, pollMs);
+        }
       }
     }
 
@@ -129,10 +145,13 @@ export function previewFeed(
 
     listen();
     void read();
+    const resign = setInterval(() => void read(), PREVIEW_RESIGN_MS);
 
     return () => {
       closed = true;
       stopPolling();
+      clearInterval(resign);
+      if (retry) clearTimeout(retry);
       if (resubscribe) clearTimeout(resubscribe);
       channel += 1;
       stopListening();

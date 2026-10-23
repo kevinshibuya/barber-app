@@ -189,6 +189,9 @@ function fakeAfterNetwork() {
       }
       objects.set(path, image);
     },
+    async removeOriginal(path) {
+      objects.delete(path);
+    },
     async recordAfterPhoto(_visitId, path) {
       if (!objects.has(path)) throw new Error(`no object at ${path}`);
       visit = { ...visit, afterPhotoPath: path };
@@ -209,15 +212,28 @@ function fakeAfterNetwork() {
 describe('after photo upload', () => {
   const after: LocalImage = { uri: 'file:///camera/after.heic', width: 3024, height: 4032 };
 
-  it('downscales the photo to the after path of the visit and records it there', async () => {
+  it('downscales the photo to its take\'s after path and records it there', async () => {
     const network = fakeAfterNetwork();
     const upload = afterPhotoUploader(network.transport, fakeImages());
 
-    const visit = await upload('v1', after);
+    const visit = await upload('v1', after, 'take1');
 
-    expect([...network.objects.keys()]).toEqual(['s1/v1/after.jpg']);
-    expect(network.objects.get('s1/v1/after.jpg')).toMatchObject({ width: 768, height: 1024 });
-    expect(visit.afterPhotoPath).toBe('s1/v1/after.jpg');
+    expect([...network.objects.keys()]).toEqual(['s1/v1/after.take1.jpg']);
+    expect(network.objects.get('s1/v1/after.take1.jpg')).toMatchObject({ width: 768, height: 1024 });
+    expect(visit.afterPhotoPath).toBe('s1/v1/after.take1.jpg');
+  });
+
+  it('puts a retake at a path of its own, removes the photo it replaced, and sends a take once', async () => {
+    const network = fakeAfterNetwork();
+    const upload = afterPhotoUploader(network.transport, fakeImages());
+    await upload('v1', after, 'take1');
+
+    const retaken = await upload('v1', { ...after, width: 4032, height: 3024 }, 'take2');
+    expect(retaken.afterPhotoPath).toBe('s1/v1/after.take2.jpg');
+    expect([...network.objects.keys()]).toEqual(['s1/v1/after.take2.jpg']);
+
+    network.failNextPut();
+    expect((await upload('v1', after, 'take2')).afterPhotoPath).toBe('s1/v1/after.take2.jpg');
   });
 
   it('leaves the visit without an after photo when the upload fails', async () => {

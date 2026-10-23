@@ -1,5 +1,11 @@
 import type { Preview } from '@barber/shared';
-import { PREVIEW_POLL_MS, type PreviewsTransport, previewFeed, type VisitPreview } from '@/api/previews';
+import {
+  PREVIEW_POLL_MS,
+  PREVIEW_RESIGN_MS,
+  type PreviewsTransport,
+  previewFeed,
+  type VisitPreview,
+} from '@/api/previews';
 
 function preview(overrides: Partial<Preview> = {}): Preview {
   return {
@@ -28,6 +34,7 @@ function preview(overrides: Partial<Preview> = {}): Preview {
 function fakeNetwork(initial: Preview[] = []) {
   let rows = initial;
   let reads = 0;
+  let failing = 0;
   let signed: string[] = [];
   let change: () => void = () => undefined;
   let health: (healthy: boolean) => void = () => undefined;
@@ -36,6 +43,10 @@ function fakeNetwork(initial: Preview[] = []) {
   const transport: PreviewsTransport = {
     async list(visitId) {
       reads += 1;
+      if (failing > 0) {
+        failing -= 1;
+        throw new Error('Network request failed');
+      }
       return rows.filter((row) => row.visitId === visitId);
     },
     async sign(paths) {
@@ -59,6 +70,9 @@ function fakeNetwork(initial: Preview[] = []) {
     listening: () => listening,
     set: (next: Preview[]) => {
       rows = next;
+    },
+    failNext: (count: number) => {
+      failing = count;
     },
     emitChange: () => change(),
     report: (healthy: boolean) => health(healthy),
@@ -113,6 +127,45 @@ describe('the previews feed', () => {
 
     expect(network.reads()).toBe(2);
     expect(network.signed()).toEqual(['s1/v1/pv1.thumb.jpg', 's1/v1/pv1.jpg']);
+  });
+
+  it('signs a done row again before its URL expires, on a picker left open', async () => {
+    const network = fakeNetwork([
+      preview({ status: 'done', storagePath: 's1/v1/pv1.jpg', thumbnailPath: 's1/v1/pv1.thumb.jpg' }),
+    ]);
+    const seen: VisitPreview[][] = [];
+    previewFeed(network.transport)('v1', (previews) => seen.push(previews));
+    await settle();
+    network.report(true);
+    await settle();
+
+    await jest.advanceTimersByTimeAsync(PREVIEW_RESIGN_MS);
+    await settle();
+
+    expect(network.signed()).toEqual([
+      's1/v1/pv1.thumb.jpg',
+      's1/v1/pv1.jpg',
+      's1/v1/pv1.thumb.jpg',
+      's1/v1/pv1.jpg',
+    ]);
+    expect(seen.at(-1)?.[0]?.imageUrl).toBe('https://signed.test/s1/v1/pv1.jpg');
+  });
+
+  it('reads again after a failed read while the subscription stays healthy', async () => {
+    const network = fakeNetwork([preview({ status: 'done', storagePath: 's1/v1/pv1.jpg', thumbnailPath: null })]);
+    const seen: VisitPreview[][] = [];
+    network.failNext(2);
+    previewFeed(network.transport)('v1', (previews) => seen.push(previews));
+    await settle();
+    network.report(true);
+    await settle();
+    expect(seen).toEqual([]);
+
+    await jest.advanceTimersByTimeAsync(PREVIEW_POLL_MS);
+    await settle();
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.[0]?.status).toBe('done');
   });
 
   it('polls every five seconds while the subscription reports an error and stops once it recovers', async () => {

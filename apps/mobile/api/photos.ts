@@ -206,31 +206,36 @@ export async function listVisitPhotos(visitId: string): Promise<VisitPhoto[]> {
 }
 
 // Everything an after photo upload sends over the network.
-export interface AfterPhotoTransport extends Pick<PhotoTransport, 'putOriginal'> {
+export interface AfterPhotoTransport extends Pick<PhotoTransport, 'putOriginal' | 'removeOriginal'> {
   visitOf(visitId: string): Promise<Visit>;
   // Points the visit at the object, which locks its look.
   recordAfterPhoto(visitId: string, path: string): Promise<Visit>;
 }
 
-// Uploads the visit's after photo, downscaled like the slots, to the visit's
+// Uploads the visit's after photo, downscaled like the slots, to its take's
 // after path, and records the path on the visit once the object is there. A
-// retake replaces the object in place. Rejects with the visit unchanged when
-// the upload fails.
+// retake goes to a path of its own, so no device mistakes it for the photo it
+// replaced, which is then removed; a take already recorded is not sent
+// again. Rejects with the visit unchanged when the upload fails.
 export function afterPhotoUploader(transport: AfterPhotoTransport, images: ImageTool) {
-  return async function upload(visitId: string, shot: LocalImage): Promise<Visit> {
+  return async function upload(visitId: string, shot: LocalImage, take?: string): Promise<Visit> {
     const [visit, image] = await Promise.all([
       transport.visitOf(visitId),
       images.toJpeg(shot, fittedSize(shot.width, shot.height)),
     ]);
-    const path = afterPhotoPath(visit.shopId, visitId);
+    const path = afterPhotoPath(visit.shopId, visitId, take);
+    if (visit.afterPhotoPath === path) return visit;
     await transport.putOriginal(path, image);
-    return transport.recordAfterPhoto(visitId, path);
+    const recorded = await transport.recordAfterPhoto(visitId, path);
+    if (visit.afterPhotoPath) await transport.removeOriginal(visit.afterPhotoPath).catch(() => undefined);
+    return recorded;
   };
 }
 
 const afterPhotoTransport: AfterPhotoTransport = {
   visitOf: getVisit,
   putOriginal: supabaseTransport.putOriginal,
+  removeOriginal: supabaseTransport.removeOriginal,
   async recordAfterPhoto(visitId, path) {
     const { error } = await supabase().from('visits').update({ after_photo_path: path }).eq('id', visitId);
     if (error) throw error;
@@ -241,6 +246,6 @@ const afterPhotoTransport: AfterPhotoTransport = {
 const uploadAfterWithSupabase = afterPhotoUploader(afterPhotoTransport, deviceImages);
 
 // Sends the after photo now. Screens queue it with `uploadAfterPhoto` instead.
-export async function sendAfterPhoto(visitId: string, shot: LocalImage): Promise<Visit> {
-  return uploadAfterWithSupabase(visitId, shot);
+export async function sendAfterPhoto(visitId: string, shot: LocalImage, take?: string): Promise<Visit> {
+  return uploadAfterWithSupabase(visitId, shot, take);
 }
