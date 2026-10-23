@@ -1,7 +1,7 @@
 // Google Gemini image, the Nano Banana 2 line, through generateContent. The
 // base image, the references and the instruction go in one user turn; the
-// answer's first inline image is the render. A prompt blocked or a candidate
-// stopped on safety grounds is the model's refusal.
+// answer's first inline image is the render. A prompt blocked, a candidate
+// stopped on safety grounds, or an answer in text only is the model's refusal.
 import type { ImageProvider, RenderRequest, RenderResult } from './image-provider';
 import {
   editInstruction,
@@ -42,6 +42,14 @@ function inlineImage(parts: unknown): Buffer | undefined {
   return undefined;
 }
 
+function textOf(parts: unknown): string {
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .map((part) => (isRecord(part) && typeof part.text === 'string' ? part.text : ''))
+    .join(' ')
+    .trim();
+}
+
 export class GeminiImageProvider implements ImageProvider {
   private readonly endpoint: string;
 
@@ -76,10 +84,14 @@ export class GeminiImageProvider implements ImageProvider {
     }
     const candidate = Array.isArray(body.candidates) ? body.candidates[0] : undefined;
     if (!isRecord(candidate)) return retryable('gemini: no candidate in the answer');
-    const image = inlineImage(isRecord(candidate.content) ? candidate.content.parts : undefined);
+    const parts = isRecord(candidate.content) ? candidate.content.parts : undefined;
+    const image = inlineImage(parts);
     if (image) return { ok: true, image };
     const finishReason = typeof candidate.finishReason === 'string' ? candidate.finishReason : 'none';
     if (SAFETY_FINISH_REASONS.has(finishReason)) return refused(`gemini: refused (${finishReason})`);
+    // Asked for an image only, the model answering in words is a decline.
+    const text = textOf(parts);
+    if (text !== '') return refused(`gemini: declined in text: ${text.slice(0, 200)}`);
     return retryable(`gemini: no image in the answer (finish reason ${finishReason})`);
   }
 }
