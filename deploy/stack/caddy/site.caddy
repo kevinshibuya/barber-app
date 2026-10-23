@@ -1,0 +1,6 @@
+# Appended to ~/apps/caddy/Caddyfile on the box (edit in place, never by
+# rename: the file is bind-mounted alone). Caddy gets the certificate itself.
+barber.kevinshibuya.com {
+	encode zstd gzip
+	reverse_proxy barber-worker:3000
+}
