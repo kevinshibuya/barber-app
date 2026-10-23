@@ -94,13 +94,51 @@ The box's rules are in the server repo's `docs/a1-resources.md`: own Compose pro
    EAS keeps the signing keystore; every APK from this project installs over the last one.
 4. Send the build page's link to the phone. Opening it on the phone downloads the APK; Android asks once to allow installs from the browser.
 
+### 4. Emulator check (optional, before sending an APK)
+
+```sh
+brew install openjdk@17 && brew install --cask android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17 ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+yes | sdkmanager --licenses
+sdkmanager "platform-tools" "emulator" "system-images;android-34;default;arm64-v8a"
+echo no | avdmanager create avd -n barber-test -k "system-images;android-34;default;arm64-v8a" -d pixel_6
+$ANDROID_HOME/emulator/emulator -avd barber-test -no-window -no-audio -no-snapshot &   # needs about 8 GB free
+adb install -r barber.apk
+```
+
+Photos for the gallery slot go in with `adb push <photo> /sdcard/Pictures/` and a media scan. A front photo uploaded from the emulator renders for real and bills like any visit.
+
+## Emulator walkthrough, 2026-10-23
+
+Build `8f504615…` then `f833c4f2…` (APK from `preview`), against the cloud project and the deployed worker, signed in as the demo owner. Screenshots in `screenshots/`.
+
+| Step | Result | Screenshot |
+|---|---|---|
+| Login | signs in; the button looks disabled after typing through adb, but the keyboard's submit works | `01-login.jpg` |
+| Home, owner dashboard | six numbers render; the dashboard showed blank for 5 to 10 s first, on a loaded Mac | `02-home.jpg`, `03-dashboard.jpg` |
+| New client, consent, photo slots | as specified; "Tirar fotos" waits for consent | `04`–`06` |
+| Front photo from the gallery | uploads, then "Enviada"; the worker rendered all 17 previews | `07`, `08` |
+| Picker | tiles collapsed to strips in build 4 (fixed, see deviation 5); full size in build 5 | `09-picker-tiles-collapsed.jpg`, `17`–`19` |
+| Full-size preview, hair plus beard on demand | renders; "Escolher este visual" waits for the combination | `10`, `11` |
+| Choose, after photo, close | the look locks once the after photo exists | `12`, `13`, `15` |
+| Share | the share sheet carries the pt-BR message and the HTTPS client page link; WhatsApp is not on the emulator | `14-share-sheet.jpg` |
+| Client page | shop name, chosen look and caption | `16-client-page.jpg` |
+| History | the visit shows on home and on the client with the look and after photo | `20`, `21` |
+
+That visit, "Cliente Teste Emulador", stays in the project for the demo.
+
 ## Deviations from the spec
 
 1. **The worker runs on Kevin's Oracle box, not Fly.io.** Decided by Kevin on 2026-10-23: the box is already paid for and has room (12 GB, 2 OCPU). The ticket's contract was amended to match.
 2. **Supabase is in `us-east-1`, not São Paulo.** The Free plan only offers region groups. Generation (about 15 s per preview at Gemini, itself in the US) dwarfs the extra round trip, and the data is demo data. Before the first real shop: move to Pro, create a project in `sa-east-1`, and rerun section 1.
 3. **No store submissions and no iOS build.** The goal is one Android phone for pitching, so the APK is the distribution. TestFlight and the Play internal track wait for real shops; an iPhone install would need the Apple Developer Program even without the App Store.
 
+4. **Two Babel plugins declared by hand.** The release bundle never ran before this ticket. Under pnpm it needs `babel-preset-expo` in `apps/mobile`, and `@babel/plugin-transform-react-jsx` (which NativeWind's preset names without declaring) at the repo root; on EAS's Gradle step nothing else made it resolvable.
+5. **Picker tiles take an explicit height.** `PickerTile` set `aspectRatio` beside a NativeWind `className`; Android's release build dropped it and the tiles collapsed. They now take `height: width * 1.5`. The Jest screen tests do not compute layout, so only a device catches this.
+
 ## Known gaps
 
 - **Password reset emails.** Supabase's built-in email only reaches members of the Supabase organization, two an hour. Barbers get no reset email until custom SMTP (Resend or similar) is set in the project's auth settings. The demo logins are set by `provision`, so the demo does not need it.
 - **The client page token can reach Caddy's error log.** The share token is in the path (`/v/<token>`), and the shared Caddyfile's log filter only strips `?token=` queries. Caddy keeps no access log, so the path is written only when a request fails at the proxy (a 502 while the worker restarts).
+- **Three picker tests fail on the integration branch**, before this ticket: `picker grid` (2) and `the full-screen preview` (1). Each reaches the finish screen, whose `api` call the test's mock lacks (`Cannot read properties of undefined (reading 'then')`).
+- **The picker grid's last row sits under Android's navigation bar**: the grid has no bottom inset. Cosmetic.
