@@ -59,7 +59,7 @@ async function send(upload: Upload): Promise<void> {
       await sendPhoto(upload.shot, upload.take);
       return;
     case 'after':
-      await sendAfterPhoto(upload.visitId, upload.shot);
+      await sendAfterPhoto(upload.visitId, upload.shot, upload.take ?? Date.now().toString(36));
       return;
   }
 }
@@ -127,7 +127,12 @@ export async function uploadPhoto(shot: PhotoUpload): Promise<void> {
 // Queues the visit's after photo and resolves with the visit once the photo
 // is recorded on it, however long the network takes.
 export async function uploadAfterPhoto(visitId: string, shot: LocalImage): Promise<Visit> {
-  const { sent } = await uploads().add({ kind: 'after', visitId, shot: await keepShot(shot) });
+  const { sent } = await uploads().add({
+    kind: 'after',
+    visitId,
+    shot: await keepShot(shot),
+    take: Date.now().toString(36),
+  });
   await sent;
   return getVisit(visitId);
 }

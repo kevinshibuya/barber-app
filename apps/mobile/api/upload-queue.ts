@@ -16,7 +16,8 @@ export interface QueuedVisit {
 export type Upload =
   | { kind: 'visit'; visit: QueuedVisit }
   | { kind: 'photo'; shot: PhotoUpload; take: string }
-  | { kind: 'after'; visitId: string; shot: LocalImage };
+  // `take` names the after photo's object; an upload queued before takes has none.
+  | { kind: 'after'; visitId: string; shot: LocalImage; take?: string };
 
 // Everything the queue sends over the network. A send that rejects is tried
 // again later, unless the queue's `isPermanent` says no retry can succeed;
