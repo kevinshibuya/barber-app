@@ -5,7 +5,9 @@
 // row is marked, so a run cut short leaves rows the next run finds again.
 // Originals and after photos live in another bucket and are never touched. A
 // visit whose share link has expired loses its token, so the link stops naming
-// it even before the page checks the expiry. The worker runs it once a night;
+// it even before the page checks the expiry. The objects of previews a retake
+// deleted, which the database lists in `orphaned_objects`, are removed and
+// then forgotten. The worker runs it once a night;
 // `pnpm --filter @barber/worker run cleanup` runs it once by hand.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { type Database, STORAGE_BUCKETS } from '@barber/shared';
@@ -24,6 +26,7 @@ export interface CleanupCounts {
   previewsPurged: number;
   objectsRemoved: number;
   linksCleared: number;
+  orphansRemoved: number;
 }
 
 export interface CleanupLine extends CleanupCounts {
@@ -87,6 +90,32 @@ async function purgePreviews(db: SupabaseClient<Database>): Promise<PurgeCounts>
   return { previewsPurged, objectsRemoved };
 }
 
+// The list is forgotten only after storage removed its objects, so a run cut
+// short leaves them for the next one.
+async function removeOrphans(db: SupabaseClient<Database>): Promise<number> {
+  let removed = 0;
+  for (;;) {
+    const batch = check(
+      await db.from('orphaned_objects').select('id, bucket, path').order('id').limit(PURGE_BATCH),
+      'orphaned objects',
+    );
+    if (!batch || batch.length === 0) break;
+    for (const bucket of new Set(batch.map((o) => o.bucket))) {
+      const paths = batch.filter((o) => o.bucket === bucket).map((o) => o.path);
+      const gone = check(await db.storage.from(bucket).remove(paths), `remove ${bucket} orphans`);
+      removed += gone?.length ?? 0;
+    }
+    check(
+      await db
+        .from('orphaned_objects')
+        .delete()
+        .in('id', batch.map((o) => o.id)),
+      'forget orphaned objects',
+    );
+  }
+  return removed;
+}
+
 async function clearExpiredLinks(db: SupabaseClient<Database>): Promise<number> {
   const cleared = check(
     await db
@@ -103,7 +132,11 @@ async function clearExpiredLinks(db: SupabaseClient<Database>): Promise<number> 
 // One run of the cleanup; logs and returns its counts.
 export async function runCleanup(options: CleanupOptions): Promise<CleanupCounts> {
   const startedAt = Date.now();
-  const counts = { ...(await purgePreviews(options.db)), linksCleared: await clearExpiredLinks(options.db) };
+  const counts = {
+    ...(await purgePreviews(options.db)),
+    linksCleared: await clearExpiredLinks(options.db),
+    orphansRemoved: await removeOrphans(options.db),
+  };
   (options.log ?? writeLine)({ event: 'cleanup', ...counts, ms: Date.now() - startedAt });
   return counts;
 }

@@ -330,6 +330,66 @@ describe('the preview queue consumer', () => {
     expect(objects.filter((o) => o.name.startsWith(dropped[0]!.previewId))).toEqual([]);
     expect(objects).toHaveLength(32);
   });
+
+  it('leaves a row claimed again while it rendered, and its objects, to the newer claim', async () => {
+    const { visit } = await visitWithFront();
+    const slickBack = style('hair', 'slick-back');
+    const provider = new FakeImageProvider({
+      beforeAnswer: async (request) => {
+        if (request.prompt !== slickBack.prompt) return;
+        // Another worker reclaims the row as stale.
+        must(
+          await service
+            .from('previews')
+            .update({ attempt_count: 2, claimed_at: new Date().toISOString() })
+            .eq('visit_id', visit.id)
+            .eq('hair_style_id', slickBack.id)
+            .select(),
+        );
+      },
+    });
+    const run = startWorker({ concurrency: 2 }, provider);
+
+    const deadline = Date.now() + 45_000;
+    while (mine(run.logs, visit.id).length < 17 && Date.now() < deadline) await sleep(100);
+
+    const row = (await previewsOf(visit.id)).find((r) => r.hair_style_id === slickBack.id)!;
+    expect(row).toMatchObject({ status: 'running', attempt_count: 2 });
+    expect(mine(run.logs, visit.id).find((l) => l.previewId === row.id)?.outcome).toBe('dropped');
+    const objects = must(await service.storage.from(STORAGE_BUCKETS.previews).list(`${shop.id}/${visit.id}`));
+    expect(objects.filter((o) => o.name.startsWith(row.id))).toHaveLength(2);
+  });
+
+  it('settles a retried row from the objects an earlier attempt stored, without rendering it again', async () => {
+    const { visit } = await visitWithFront();
+    const quiff = style('hair', 'quiff');
+    const row = (await previewsOf(visit.id)).find((r) => r.hair_style_id === quiff.id)!;
+    // The first attempt stored both objects, then died before settling.
+    const stored = await solidJpeg(768, 1024, '#963');
+    for (const path of [previewImagePath(shop.id, visit.id, row.id), previewThumbnailPath(shop.id, visit.id, row.id)]) {
+      must(
+        await service.storage
+          .from(STORAGE_BUCKETS.previews)
+          .upload(path, stored, { contentType: 'image/jpeg', upsert: true }),
+      );
+    }
+    must(
+      await service
+        .from('previews')
+        .update({ status: 'running', attempt_count: 1, claimed_at: new Date(Date.now() - 60_000).toISOString() })
+        .eq('id', row.id)
+        .select(),
+    );
+    const run = startWorker({ staleAfterSeconds: 1 });
+
+    const rows = await settled(visit.id);
+
+    expect(rows.find((r) => r.id === row.id)).toMatchObject({ status: 'done', attempt_count: 2 });
+    expect(run.provider.calls.filter((c) => c.prompt === quiff.prompt)).toEqual([]);
+    expect((await download(STORAGE_BUCKETS.previews, previewImagePath(shop.id, visit.id, row.id))).equals(stored)).toBe(
+      true,
+    );
+  });
 });
 
 describe('the worker\'s configuration', () => {

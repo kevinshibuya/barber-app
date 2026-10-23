@@ -9,6 +9,7 @@ import {
   type PhotoSlot,
   SHARE_TOKEN_LENGTH,
   STORAGE_BUCKETS,
+  visitObjectPrefix,
 } from '@barber/shared';
 import { strings } from './strings';
 
@@ -91,7 +92,7 @@ export class ClientPage {
     const { data: visit, error } = await this.db
       .from('visits')
       .select(
-        'id, chosen_preview_id, after_photo_path, shop:shops(name), chosen_hair:styles!visits_chosen_hair_style_id_fkey(slug), chosen_beard:styles!visits_chosen_beard_style_id_fkey(slug)',
+        'id, shop_id, chosen_preview_id, after_photo_path, shop:shops(name), chosen_hair:styles!visits_chosen_hair_style_id_fkey(slug), chosen_beard:styles!visits_chosen_beard_style_id_fkey(slug)',
       )
       .eq('share_token', token)
       .gt('share_expires_at', new Date().toISOString())
@@ -114,12 +115,14 @@ export class ClientPage {
     if (photos.error) throw photos.error;
     if (previews.error) throw previews.error;
 
-    const originals = await this.sign(STORAGE_BUCKETS.originals, [
+    const prefix = visitObjectPrefix(visit.shop_id, visit.id);
+    const originals = await this.sign(STORAGE_BUCKETS.originals, prefix, [
       ...photos.data.map((p) => p.storage_path),
       ...(visit.after_photo_path ? [visit.after_photo_path] : []),
     ]);
     const previewUrls = await this.sign(
       STORAGE_BUCKETS.previews,
+      prefix,
       previews.data.flatMap((p) => (p.storage_path ? [p.storage_path] : [])),
     );
 
@@ -154,10 +157,12 @@ export class ClientPage {
     };
   }
 
-  // Each path's signed URL; a path storage could not sign is left out.
-  private async sign(bucket: string, paths: string[]): Promise<Map<string, string>> {
-    if (paths.length === 0) return new Map();
-    const { data, error } = await this.db.storage.from(bucket).createSignedUrls(paths, IMAGE_URL_TTL_SECONDS);
+  // Each path's signed URL; a path storage could not sign is left out, and so
+  // is a path outside the visit's prefix, which names another visit's object.
+  private async sign(bucket: string, prefix: string, paths: string[]): Promise<Map<string, string>> {
+    const own = paths.filter((path) => path.startsWith(prefix));
+    if (own.length === 0) return new Map();
+    const { data, error } = await this.db.storage.from(bucket).createSignedUrls(own, IMAGE_URL_TTL_SECONDS);
     if (error) throw error;
     return new Map(data.flatMap((s) => (s.path && s.signedUrl && !s.error ? [[s.path, s.signedUrl]] : [])));
   }

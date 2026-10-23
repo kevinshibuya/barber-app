@@ -17,6 +17,10 @@ services:
     cpu_shares: 512
     pids_limit: 256
     restart: unless-stopped
+    # SIGTERM lets the rows in flight settle: a render takes about 15 s and at
+    # most the provider's 120 s timeout. Docker's default 10 s would kill them
+    # mid-render, to be rendered and billed again once they go stale.
+    stop_grace_period: 150s
     networks:
       web:
         aliases: [barber-worker]
