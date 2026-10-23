@@ -130,7 +130,7 @@ That visit, "Cliente Teste Emulador", stays in the project for the demo.
 ## Deviations from the spec
 
 1. **The worker runs on Kevin's Oracle box, not Fly.io.** Decided by Kevin on 2026-10-23: the box is already paid for and has room (12 GB, 2 OCPU). The ticket's contract was amended to match.
-2. **Supabase is in `us-east-1`, not São Paulo.** The Free plan only offers region groups. Generation (about 15 s per preview at Gemini, itself in the US) dwarfs the extra round trip, and the data is demo data. Before the first real shop: move to Pro, create a project in `sa-east-1`, and rerun section 1.
+2. **Supabase is in `us-east-1`, not São Paulo.** The Free plan only offers region groups. Generation (about 15 s per preview at Gemini, itself in the US) dwarfs the extra round trip, and the data is demo data. The project stays on the Free plan: Kevin decided on 2026-10-23 not to move to Supabase Pro. Which service and architecture carry the first real shop is a later grilling.
 3. **No store submissions and no iOS build.** The goal is one Android phone for pitching, so the APK is the distribution. TestFlight and the Play internal track wait for real shops; an iPhone install would need the Apple Developer Program even without the App Store.
 
 4. **Two Babel plugins declared by hand.** The release bundle never ran before this ticket. Under pnpm it needs `babel-preset-expo` in `apps/mobile`, and `@babel/plugin-transform-react-jsx` (which NativeWind's preset names without declaring) at the repo root; on EAS's Gradle step nothing else made it resolvable.
@@ -140,5 +140,4 @@ That visit, "Cliente Teste Emulador", stays in the project for the demo.
 
 - **Password reset emails.** Supabase's built-in email only reaches members of the Supabase organization, two an hour. Barbers get no reset email until custom SMTP (Resend or similar) is set in the project's auth settings. The demo logins are set by `provision`, so the demo does not need it.
 - **The client page token can reach Caddy's error log.** The share token is in the path (`/v/<token>`), and the shared Caddyfile's log filter only strips `?token=` queries. Caddy keeps no access log, so the path is written only when a request fails at the proxy (a 502 while the worker restarts).
-- **Three picker tests fail on the integration branch**, before this ticket: `picker grid` (2) and `the full-screen preview` (1). Each reaches the finish screen, whose `api` call the test's mock lacks (`Cannot read properties of undefined (reading 'then')`).
-- **The picker grid's last row sits under Android's navigation bar**: the grid has no bottom inset. Cosmetic.
+- **A Gemini answer in words that stopped normally is a refusal.** The worker never retries it, so if the model meant to draw and only said so, that tile and its beard combinations stay unavailable for the visit. The row's `error` quotes the first 200 characters of the answer. No such answer has been seen yet; a real decline has not been seen either.
