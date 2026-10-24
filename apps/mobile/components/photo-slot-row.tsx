@@ -1,10 +1,11 @@
 import { Button } from '@/components/ui/button';
+import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import type { SlotState } from '@/api/slots';
 import type { PhotoSource } from '@/lib/pick-photo';
 import { strings } from '@/lib/strings';
 import type { PhotoSlot } from '@barber/shared';
-import { ActivityIndicator, Image, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 // One slot, laid out like a visit row: the shot's thumbnail, the slot's name
 // and upload state, and its camera and gallery buttons. A filled slot is

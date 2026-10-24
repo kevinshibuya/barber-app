@@ -6,6 +6,7 @@ import { PickerTile } from '@/components/picker-tile';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
+import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import {
   chooseLook,
@@ -36,7 +37,7 @@ import { type PhotoSlot, STYLE_DIMENSIONS, type StyleDimension, type Visit } fro
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // The header's scrim, darkest at the top edge, so its white text reads on any photo.
@@ -125,7 +126,16 @@ export default function PickerScreen() {
     }, [visitId]),
   );
 
-  useEffect(() => subscribeToPreviews(visitId, setPreviews), [visitId]);
+  // Each delivery of the feed warms the image cache with the done previews.
+  const [prefetch] = useState(previewPrefetcher);
+  useEffect(
+    () =>
+      subscribeToPreviews(visitId, (delivered) => {
+        setPreviews(delivered);
+        prefetch(delivered);
+      }),
+    [visitId, prefetch],
+  );
 
   // The look on the front, which the picker shows, and on every angle, which
   // the full-screen pages show.
@@ -282,11 +292,14 @@ export default function PickerScreen() {
           onPress={openFullScreen}
           className="absolute inset-0"
         >
+          {/* No transition and no recycling key: a new look replaces the
+              last one only once it is decoded, so the photo never blanks. */}
           {look.imageUrl && (
             <Image
               testID="look-image"
               source={{ uri: look.imageUrl }}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={0}
               className="absolute inset-0"
             />
           )}
@@ -364,6 +377,27 @@ function without(keys: ReadonlySet<string>, key: string): ReadonlySet<string> {
   const rest = new Set(keys);
   rest.delete(key);
   return rest;
+}
+
+// Fetches the full-size image of each done preview into the image cache (memory
+// and disk, prefetch's default), so a tap on a finished tile draws at once.
+// Thumbnails are not fetched: the grid loads them itself. A URL is fetched
+// once while in flight or once it succeeded; one that failed is fetched again
+// on the next delivery. A renewed signed URL is a new URL, so it is fetched
+// too, which keeps a picker left open warm.
+function previewPrefetcher() {
+  const fetched = new Set<string>();
+  return (previews: VisitPreview[]) => {
+    for (const preview of previews) {
+      const url = preview.status === 'done' && !preview.purgedAt ? preview.imageUrl : null;
+      if (!url || fetched.has(url)) continue;
+      fetched.add(url);
+      Image.prefetch(url).then(
+        (ok) => ok || fetched.delete(url),
+        () => fetched.delete(url),
+      );
+    }
+  };
 }
 
 // A look whose request failed before its row existed reads as failed, so a
