@@ -114,7 +114,7 @@ The preview shows the image for the current hair and beard pair (spec, story 29)
 Opened by tapping the preview region. It uses graft C, with the controls laid on the photo:
 
 - **Close:** the graft D back arrow at the top-left returns to the picker with the same selection.
-- **Angles** (spec, story 28): pages swipe horizontally in slot order `Frente`, `Esquerda`, `Direita`, `Costas`, and only the slots the visit has photos for appear. A label row sits at the bottom-left on the graft B scrim, styled as the spine's tab row in white: the current angle is bold with the underline bar. The labels can also be tapped. Front opens first.
+- **Angles** (spec, story 28; spec #27): pages swipe horizontally in angle order `Frente`, `Esquerda`, `Direita`, `Trás`, and only the angles the visit has photos for appear. The angle pills, the same component as on the picker's photo, sit at the bottom-left on the graft B scrim: the current angle is filled white. A pill tap pages to its angle. Full screen opens on the picker's current angle and closes back to the angle it was on.
 - **Angle filling in:** a non-front angle renders on demand when its page is first shown. Until it is `done`, the page shows that slot's original photo with the library activity indicator and `Gerando este ângulo…`, centred.
 - **Angle failed or refused:** `Falhou · toque para tentar` (a tap retries) or `Indisponível`, in the same place.
 - **Choose:** the spine's pill sits at the bottom-right, the same pill as in the picker. It chooses the look shown on the current page.
@@ -162,10 +162,10 @@ These go in the app's one strings file.
 | `picker.tile.refused` | Indisponível | tile status line, angle overlay |
 | `picker.preview.combining` | Juntando cabelo e barba… | combination pending overlay |
 | `picker.preview.comboRefused` | Indisponível para esta combinação | combination refused overlay |
-| `picker.angle.front` | Frente | angle label |
-| `picker.angle.left` | Esquerda | angle label |
-| `picker.angle.right` | Direita | angle label |
-| `picker.angle.back` | Costas | angle label |
+| `picker.angle.front` | Frente | angle pill |
+| `picker.angle.left` | Esquerda | angle pill |
+| `picker.angle.right` | Direita | angle pill |
+| `picker.angle.back` | Trás | angle pill |
 | `picker.angle.generating` | Gerando este ângulo… | angle pending overlay |
 | `picker.choose` | Escolher este visual | choose pill |
 | `picker.chosen` | Visual escolhido | choose pill, current pair already chosen |
@@ -173,3 +173,4 @@ These go in the app's one strings file.
 | `picker.finish` | Finalizar | header, right |
 | `picker.a11y.back` | Voltar | back arrow accessibility label |
 | `picker.a11y.openPreview` | Ver em tela cheia | preview region accessibility label |
+| `picker.a11y.angles` | Ângulos | angle pills accessibility label |
