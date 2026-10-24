@@ -1,5 +1,4 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
 import type { VisitPreview } from '@/api';
@@ -73,10 +72,7 @@ async function openFullScreen() {
 
 // A swipe that settles on the page.
 async function swipeTo(page: number) {
-  const { width } = Dimensions.get('window');
-  await fireEvent(fullScreen().getByTestId('angle-pager'), 'momentumScrollEnd', {
-    nativeEvent: { contentOffset: { x: page * width, y: 0 } },
-  });
+  await fireEvent(fullScreen().getByTestId('angle-pager'), 'pageSelected', { nativeEvent: { position: page } });
 }
 
 const PRE_RENDERED = [previewOf('low-fade', 'done'), previewOf('goatee', 'done')];
@@ -207,7 +203,8 @@ describe('the full-screen preview', () => {
 
     expect(screen.queryByTestId('full-screen-preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Degradê baixo' })).toBeSelected();
-    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
+    // The picker stays on the angle full screen was on.
+    expect(imageUri(lookImage())).toBe(LEFT_URL);
   });
 
   it('chooses the combination from full screen with its preview id', async () => {

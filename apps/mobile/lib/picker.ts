@@ -9,7 +9,7 @@ export type TileStatus = 'keep' | 'generating' | 'done' | 'failed' | 'refused';
 export interface Tile {
   style: CatalogStyle;
   status: TileStatus;
-  // The thumbnail once done, the reference image until then; the front photo for keep.
+  // The thumbnail once done, the reference image until then; the angle's photo for keep.
   imageUrl: string | null;
   preview: VisitPreview | null;
 }
@@ -60,19 +60,21 @@ function statusOf(preview: VisitPreview | null): TileStatus {
   return preview.status;
 }
 
-// The tiles of one tab: each style rendered with the other dimension kept.
+// The tiles of one tab on one angle: each style rendered with the other
+// dimension kept.
 export function tilesFor(
   dimension: StyleDimension,
   catalog: Catalog,
   previews: VisitPreview[],
-  frontPhotoUrl: string | null,
+  slot: PhotoSlot,
+  photoUrl: string | null,
 ): Tile[] {
   return catalog[dimension].map((style) => {
-    if (style === catalog.keep[dimension]) return { style, status: 'keep', imageUrl: frontPhotoUrl, preview: null };
+    if (style === catalog.keep[dimension]) return { style, status: 'keep', imageUrl: photoUrl, preview: null };
     const preview =
       dimension === 'hair'
-        ? previewFor(previews, style.id, catalog.keep.beard.id)
-        : previewFor(previews, catalog.keep.hair.id, style.id);
+        ? previewFor(previews, style.id, catalog.keep.beard.id, slot)
+        : previewFor(previews, catalog.keep.hair.id, style.id, slot);
     const status = statusOf(preview);
     const imageUrl = status === 'done' ? (preview?.thumbnailUrl ?? style.referenceImageUrl) : style.referenceImageUrl;
     return { style, status, imageUrl, preview };
