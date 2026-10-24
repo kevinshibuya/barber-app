@@ -8,6 +8,8 @@ module.exports = {
   // Gesture handler's native module is mocked before any test file loads it.
   setupFiles: ['react-native-gesture-handler/jestSetup'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  // Reanimated and worklets run their JS implementations in tests.
+  resolver: '<rootDir>/tests/support/resolver.js',
   // A file's first `renderRouter` loads every route; on a machine busy with
   // parallel gates that alone can pass Jest's 5 s default.
   testTimeout: 30_000,
