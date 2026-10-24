@@ -141,6 +141,8 @@ export const strings = {
     },
     choose: 'Escolher este visual',
     chosen: 'Visual escolhido',
+    choosePending: 'Gerando o visual…',
+    locked: 'Visual travado: já tem foto do depois',
     chooseError: 'Não deu para salvar a escolha. Tente de novo.',
     finish: 'Finalizar',
     a11y: { back: 'Voltar', openPreview: 'Ver em tela cheia', angles: 'Ângulos' },

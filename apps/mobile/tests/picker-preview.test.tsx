@@ -94,7 +94,7 @@ describe('hair-plus-beard combinations', () => {
     });
     expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     expect(await screen.findByText(strings.picker.preview.combining)).toBeOnTheScreen();
-    expect(chooseButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'goatee', 'running')]);
     expect(screen.getByText(strings.picker.preview.combining)).toBeOnTheScreen();
@@ -175,7 +175,7 @@ describe('the full-screen preview', () => {
     expect(view.getByRole('tab', { name: strings.picker.angle.left })).toBeSelected();
     expect(imageUri(view.getByTestId('angle-image-left'))).toBe(LEFT_URL);
     expect(await view.findByText(strings.picker.angle.generating)).toBeOnTheScreen();
-    expect(view.getByRole('button', { name: strings.picker.choose })).toBeDisabled();
+    expect(view.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'keep', 'running', { slot: 'left' })]);
     expect(view.getByText(strings.picker.angle.generating)).toBeOnTheScreen();
