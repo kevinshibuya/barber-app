@@ -177,7 +177,7 @@ describe('picker grid', () => {
     expect(tile('Degradê baixo')).toBeSelected();
     expect(tile(strings.picker.tile.keep)).not.toBeSelected();
     expect(imageUri(lookImage())).toBe('https://styles.test/hair/low-fade.png');
-    expect(chooseButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([previewOf('low-fade', 'done')]);
 
@@ -254,7 +254,7 @@ describe('picker grid', () => {
 
     await fireEvent.press(tile('Topete'));
 
-    expect(chooseButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.locked })).toBeDisabled();
   });
 
   it('locks the look on a picker gone back to after the after photo was taken', async () => {
@@ -280,7 +280,7 @@ describe('picker grid', () => {
     await waitFor(() => expect(router.getPathname()).toBe('/visits/v1/picker'));
     await fireEvent.press(tile('Topete'));
 
-    await waitFor(() => expect(chooseButton()).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: strings.picker.locked })).toBeDisabled());
   });
 
   it('offers again a pair whose chosen preview a retake replaced', async () => {

@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import type { LookPreview } from '@/lib/picker';
 import { strings } from '@/lib/strings';
+import { THEME } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { useColorScheme } from 'nativewind';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 function statusText(look: LookPreview): string | null {
@@ -56,7 +58,8 @@ export function LookStatus({
 }
 
 // The spine's floating pill: chooses the look once it is done, and reads as
-// chosen while the pair on screen is the visit's look.
+// chosen while the pair on screen is the visit's look. Disabled, it says why:
+// the look is locked, or the look on screen is still rendering.
 export function ChoosePill({
   look,
   chosen,
@@ -71,13 +74,26 @@ export function ChoosePill({
   saving: boolean;
   onChoose: (look: LookPreview) => void;
 }) {
+  const { colorScheme } = useColorScheme();
+  const pending = look.status === 'generating' || look.status === 'combining';
+  const label = chosen
+    ? strings.picker.chosen
+    : locked
+      ? strings.picker.locked
+      : pending
+        ? strings.picker.choosePending
+        : strings.picker.choose;
   return (
     <Button
       className="rounded-full px-6"
+      accessibilityLabel={label}
       disabled={look.status !== 'done' || chosen || locked || saving}
       onPress={() => onChoose(look)}
     >
-      <Text className="font-bold">{chosen ? strings.picker.chosen : strings.picker.choose}</Text>
+      {label === strings.picker.choosePending && (
+        <ActivityIndicator size="small" color={THEME[colorScheme ?? 'light'].primaryForeground} />
+      )}
+      <Text className="font-bold">{label}</Text>
     </Button>
   );
 }
