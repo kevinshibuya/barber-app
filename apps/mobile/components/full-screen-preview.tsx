@@ -1,13 +1,14 @@
 import { CAPTION_SCRIM } from '@/components/picker-tile';
 import { LookStatus } from '@/components/look-status';
 import { Icon } from '@/components/ui/icon';
+import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import type { LookPreview } from '@/lib/picker';
 import { strings } from '@/lib/strings';
 import { cn } from '@/lib/utils';
 import { ArrowLeft } from 'lucide-react-native';
 import { type ReactNode, useRef } from 'react';
-import { Image, Modal, Pressable, ScrollView, type ScrollViewInstance, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, type ScrollViewInstance, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // The selected look full screen (graft C): one page per photographed angle,
@@ -54,7 +55,7 @@ export function FullScreenPreview({
                 <Image
                   testID={`angle-image-${look.slot}`}
                   source={{ uri: look.imageUrl }}
-                  resizeMode="cover"
+                  contentFit="cover"
                   className="absolute inset-0"
                 />
               )}

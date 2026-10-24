@@ -5,6 +5,7 @@ import * as api from '@/api';
 import type { VisitPreview } from '@/api';
 import { strings } from '@/lib/strings';
 import { client, openVisit, uploadedPhoto } from './support/fixtures';
+import { imageUri } from './support/image';
 import { CATALOG, pairPreview, previewOf } from './support/picker';
 
 const FRONT_URL = 'https://storage.test/front.jpg';
@@ -95,7 +96,7 @@ describe('hair-plus-beard combinations', () => {
       beardStyleId: 'beard-goatee',
       slot: 'front',
     });
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     expect(await screen.findByText(strings.picker.preview.combining)).toBeOnTheScreen();
     expect(chooseButton()).toBeDisabled();
 
@@ -104,7 +105,7 @@ describe('hair-plus-beard combinations', () => {
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'goatee', 'done')]);
 
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade+goatee.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade+goatee.jpg');
     expect(screen.queryByText(strings.picker.preview.combining)).toBeNull();
     await waitFor(() => expect(chooseButton()).toBeEnabled());
   });
@@ -118,7 +119,7 @@ describe('hair-plus-beard combinations', () => {
 
     expect(screen.getByText(strings.picker.preview.comboRefused)).toBeOnTheScreen();
     expect(screen.queryByText(strings.picker.preview.combining)).toBeNull();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     expect(chooseButton()).toBeDisabled();
     await fireEvent.press(chooseButton());
     expect(api.chooseLook).not.toHaveBeenCalled();
@@ -127,7 +128,7 @@ describe('hair-plus-beard combinations', () => {
     await fireEvent.press(screen.getByRole('button', { name: strings.picker.tile.keep }));
 
     expect(screen.queryByText(strings.picker.preview.comboRefused)).toBeNull();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     await waitFor(() => expect(chooseButton()).toBeEnabled());
     await fireEvent.press(chooseButton());
 
@@ -163,7 +164,7 @@ describe('the full-screen preview', () => {
     expect(view.getByRole('tab', { name: strings.picker.angle.front })).toBeSelected();
     expect(view.getByRole('tab', { name: strings.picker.angle.left })).not.toBeSelected();
     expect(view.queryByRole('tab', { name: strings.picker.angle.right })).toBeNull();
-    expect(view.getByTestId('angle-image-front')).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(view.getByTestId('angle-image-front'))).toBe('https://previews.test/pv-low-fade.jpg');
     expect(api.requestPreview).not.toHaveBeenCalled();
 
     await swipeTo(1);
@@ -176,7 +177,7 @@ describe('the full-screen preview', () => {
       slot: 'left',
     });
     expect(view.getByRole('tab', { name: strings.picker.angle.left })).toBeSelected();
-    expect(view.getByTestId('angle-image-left')).toHaveProp('source', { uri: LEFT_URL });
+    expect(imageUri(view.getByTestId('angle-image-left'))).toBe(LEFT_URL);
     expect(await view.findByText(strings.picker.angle.generating)).toBeOnTheScreen();
     expect(view.getByRole('button', { name: strings.picker.choose })).toBeDisabled();
 
@@ -185,9 +186,7 @@ describe('the full-screen preview', () => {
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'keep', 'done', { slot: 'left' })]);
 
-    expect(view.getByTestId('angle-image-left')).toHaveProp('source', {
-      uri: 'https://previews.test/pv-low-fade@left.jpg',
-    });
+    expect(imageUri(view.getByTestId('angle-image-left'))).toBe('https://previews.test/pv-low-fade@left.jpg');
     expect(view.queryByText(strings.picker.angle.generating)).toBeNull();
     expect(api.requestPreview).toHaveBeenCalledTimes(1);
   });
@@ -208,7 +207,7 @@ describe('the full-screen preview', () => {
 
     expect(screen.queryByTestId('full-screen-preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Degradê baixo' })).toBeSelected();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
   });
 
   it('chooses the combination from full screen with its preview id', async () => {
@@ -219,9 +218,7 @@ describe('the full-screen preview', () => {
 
     const view = await openFullScreen();
 
-    expect(view.getByTestId('angle-image-front')).toHaveProp('source', {
-      uri: 'https://previews.test/pv-low-fade+goatee.jpg',
-    });
+    expect(imageUri(view.getByTestId('angle-image-front'))).toBe('https://previews.test/pv-low-fade+goatee.jpg');
     await fireEvent.press(view.getByRole('button', { name: strings.picker.choose }));
 
     expect(api.chooseLook).toHaveBeenCalledWith('v1', {
