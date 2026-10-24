@@ -110,7 +110,10 @@ export const strings = {
     retry: 'Tentar de novo',
     cameraDenied: 'Permita o acesso à câmera nas configurações do celular.',
     continue: 'Continuar',
+    viewer: { open: (angle: string) => `Ver ${angle} em tela cheia` },
   },
+  // The dismissable full-screen modal's header, shared by every full screen.
+  modal: { back: 'Voltar' },
   connectivity: {
     offline: 'Sem conexão',
     waiting: (count: number) => `Sem conexão · ${count} ${count === 1 ? 'envio' : 'envios'} na fila`,
