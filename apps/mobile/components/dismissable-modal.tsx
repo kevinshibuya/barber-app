@@ -34,6 +34,10 @@ export function DismissableModal({
   testID?: string;
   children: ReactNode;
 }) {
+  // The insets come from the app's provider, never a SafeAreaView: a Modal's
+  // content is its own native tree, where SafeAreaView finds no provider and
+  // reads its own insets once, as it enters the window mid-presentation, and
+  // never again: the arrow lands under the clock.
   const insets = useSafeAreaInsets();
   const offset = useSharedValue(0);
 
