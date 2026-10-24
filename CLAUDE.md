@@ -18,3 +18,17 @@ Bake-off renders go to `~/keki/dev/personal_projects/barber-app-bakeoff/` (`--ou
 ## Test data stays
 
 Visits, photos and previews made while testing a cloud project stay in it: they are what the demo shows. Never delete them, or their storage objects, unless Kevin asks for that cleanup.
+
+## iOS Simulator
+
+The simulator runs one job at a time on this Mac, which has 8 GB of RAM. Boot one only when `xcrun simctl list devices booted` is empty; a booted device belongs to another session, so wait for it. A simulator job may run beside an AFK run that does not use the simulator.
+
+Running the app there, against the local stack and free:
+
+- Metro on a second port through `devserve`: `npx expo start --go --port <N>` from `apps/mobile`. `--go` opens it in Expo Go; without it, `expo-dev-client` expects a development build.
+- `apps/mobile/.env` points at the cloud project. Put the local `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (from `supabase status`) in the shell environment, which Expo keeps over `.env`. Signing in as a user that exists only locally confirms the app reads the local stack.
+- Seed visits through the service role, as `apps/worker/test/support/client-page.ts` does. With no worker running, a requested preview stays pending until you mark it done.
+- The simulator has no camera: `xcrun simctl addmedia` puts a photo in its gallery.
+- Taps, text and screenshots go through the `xcodebuildmcp` MCP server, registered at local scope for this checkout only. Its snapshot target list leaves out `role="tab"` elements; tap those by label with its bundled `axe tap --label`.
+- `simctl openurl` on a cold Expo Go can time out while the app still opens. Take a snapshot before retrying.
+- Shut the simulator and Metro down when the job ends.
