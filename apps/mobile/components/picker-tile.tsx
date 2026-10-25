@@ -9,6 +9,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 export const CAPTION_SCRIM = { backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent)' };
 
 const STATUS_LINE = {
+  unrequested: strings.picker.tile.unrequested,
   generating: strings.picker.tile.generating,
   failed: strings.picker.tile.failed,
   refused: strings.picker.tile.refused,

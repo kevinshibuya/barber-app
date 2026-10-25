@@ -51,6 +51,7 @@ export function FullScreenPreview({
                   <Image
                     testID={`angle-image-${look.slot}`}
                     source={{ uri: look.imageUrl }}
+                    cachePolicy="memory-disk"
                     contentFit="cover"
                     className="absolute inset-0"
                   />

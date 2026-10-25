@@ -2,7 +2,7 @@ import { AnglePager, AnglePills } from '@/components/angle-pager';
 import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { FormError } from '@/components/form-error';
 import { FullScreenPreview } from '@/components/full-screen-preview';
-import { ChoosePill, LookStatus } from '@/components/look-status';
+import { ChoosePill, LookStatus, type LockReason } from '@/components/look-status';
 import { PickerTile } from '@/components/picker-tile';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
@@ -237,7 +237,8 @@ export default function PickerScreen() {
     visit.chosenBeardStyleId === selection.beard &&
     (keepBoth || visit.chosenPreviewId !== null);
   // Once the after photo is taken, or the visit closed, the look is the record.
-  const locked = visit.afterPhotoPath !== null || visit.status === 'closed';
+  const locked: LockReason | null =
+    visit.afterPhotoPath !== null ? 'afterPhoto' : visit.status === 'closed' ? 'closed' : null;
   const tileWidth = (width - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
 
   async function choose(chosenLook: LookPreview) {
@@ -299,11 +300,13 @@ export default function PickerScreen() {
                 className="flex-1"
               >
                 {/* No transition and no recycling key: a new look replaces the
-                    last one only once it is decoded, so the photo never blanks. */}
+                    last one only once it is decoded, so the photo never blanks.
+                    The memory cache is the one the prefetch filled. */}
                 {pageLook?.imageUrl && (
                   <Image
                     testID={onScreen ? 'look-image' : undefined}
                     source={{ uri: pageLook.imageUrl }}
+                    cachePolicy="memory-disk"
                     contentFit="cover"
                     transition={0}
                     className="absolute inset-0"

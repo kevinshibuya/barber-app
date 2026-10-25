@@ -57,9 +57,12 @@ export function LookStatus({
   );
 }
 
+// Why the visit's look can no longer change.
+export type LockReason = 'afterPhoto' | 'closed';
+
 // The spine's floating pill: chooses the look once it is done, and reads as
 // chosen while the pair on screen is the visit's look. Disabled, it says why:
-// the look is locked, or the look on screen is still rendering.
+// the look is locked, and by what, or the look on screen is still rendering.
 export function ChoosePill({
   look,
   chosen,
@@ -69,8 +72,7 @@ export function ChoosePill({
 }: {
   look: LookPreview;
   chosen: boolean;
-  // The visit's look can no longer change.
-  locked: boolean;
+  locked: LockReason | null;
   saving: boolean;
   onChoose: (look: LookPreview) => void;
 }) {
@@ -79,7 +81,7 @@ export function ChoosePill({
   const label = chosen
     ? strings.picker.chosen
     : locked
-      ? strings.picker.locked
+      ? strings.picker.locked[locked]
       : pending
         ? strings.picker.choosePending
         : strings.picker.choose;
@@ -87,7 +89,7 @@ export function ChoosePill({
     <Button
       className="rounded-full px-6"
       accessibilityLabel={label}
-      disabled={look.status !== 'done' || chosen || locked || saving}
+      disabled={look.status !== 'done' || chosen || locked !== null || saving}
       onPress={() => onChoose(look)}
     >
       {label === strings.picker.choosePending && (

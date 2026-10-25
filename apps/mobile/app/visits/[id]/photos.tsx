@@ -92,7 +92,7 @@ export default function PhotosScreen() {
       </ScrollView>
       {viewing && viewed && (
         <PhotoViewer
-          slot={viewing}
+          angle={viewing}
           image={viewed}
           busy={slots[viewing].status === 'uploading'}
           cameraDenied={cameraDenied}
