@@ -17,14 +17,14 @@ import { fitContainer, ResumableZoom, type ResumableZoomRefType } from 'react-na
 // retake it. A zoomed photo keeps every drag for panning; at rest a swipe
 // down closes the viewer.
 export function PhotoViewer({
-  slot,
+  angle,
   image,
   busy,
   cameraDenied,
   onShoot,
   onClose,
 }: {
-  slot: PhotoSlot;
+  angle: PhotoSlot;
   image: LocalImage;
   busy: boolean;
   cameraDenied: boolean;
@@ -41,7 +41,7 @@ export function PhotoViewer({
   return (
     <DismissableModal
       testID="photo-viewer"
-      title={strings.photos.slots[slot]}
+      title={strings.photos.slots[angle]}
       onClose={onClose}
       swipeEnabled={!zoomed}
     >

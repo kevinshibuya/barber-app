@@ -119,9 +119,22 @@ describe('the choose pill on a chosen look', () => {
 
     await pick('hair', 'Topete');
 
-    expect(screen.getByRole('button', { name: strings.picker.locked })).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.locked.afterPhoto })).toBeDisabled();
     expect(screen.queryByRole('button', { name: strings.picker.choose })).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: strings.picker.locked }));
+    await fireEvent.press(screen.getByRole('button', { name: strings.picker.locked.afterPhoto }));
     expect(api.chooseLook).not.toHaveBeenCalled();
+  });
+
+  it('says the visit is closed, not that it has an after photo, on a visit closed without one', async () => {
+    jest.mocked(api.getVisit).mockResolvedValue(
+      openVisit({ ...CHOSEN_LOW_FADE, status: 'closed', closedAt: '2026-10-22T15:00:00.000Z' }),
+    );
+    await openPicker();
+    await emit([previewOf('low-fade', 'done'), previewOf('quiff', 'done')]);
+
+    await pick('hair', 'Topete');
+
+    expect(screen.getByRole('button', { name: strings.picker.locked.closed })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: strings.picker.locked.afterPhoto })).toBeNull();
   });
 });

@@ -254,7 +254,7 @@ describe('picker grid', () => {
 
     await fireEvent.press(tile('Topete'));
 
-    expect(screen.getByRole('button', { name: strings.picker.locked })).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.locked.afterPhoto })).toBeDisabled();
   });
 
   it('locks the look on a picker gone back to after the after photo was taken', async () => {
@@ -280,7 +280,7 @@ describe('picker grid', () => {
     await waitFor(() => expect(router.getPathname()).toBe('/visits/v1/picker'));
     await fireEvent.press(tile('Topete'));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: strings.picker.locked })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: strings.picker.locked.afterPhoto })).toBeDisabled());
   });
 
   it('offers again a pair whose chosen preview a retake replaced', async () => {

@@ -125,6 +125,8 @@ describe('switching between finished previews', () => {
 
     // One image element throughout: the previous picture stays until the next is drawn.
     expect(lookImage()).toBe(image);
+    // It reads the memory cache the prefetch filled, not the disk alone.
+    expect(lookImage().props.cachePolicy).toBe('memory-disk');
     expect(api.requestPreview).not.toHaveBeenCalled();
     expect(screen.queryByText(strings.picker.preview.combining)).toBeNull();
     expect(screen.queryByText(strings.picker.tile.generating)).toBeNull();

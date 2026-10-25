@@ -162,6 +162,7 @@ describe('the full-screen preview', () => {
     expect(view.queryByRole('tab', { name: strings.picker.angle.right })).toBeNull();
     expect(imageUri(view.getByTestId('angle-image-front'))).toBe('https://previews.test/pv-low-fade.jpg');
     expect(api.requestPreview).not.toHaveBeenCalled();
+    expect(view.getByTestId('angle-image-front').props.cachePolicy).toBe('memory-disk');
 
     await swipeTo(1);
 

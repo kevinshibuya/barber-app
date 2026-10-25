@@ -3,8 +3,9 @@
 import { KEEP_STYLE_SLUG, type PhotoSlot, type StyleDimension } from '@barber/shared';
 import type { CatalogStyle, PreviewRequest, VisitPreview } from '@/api';
 
-// A pre-rendered preview fills in until it is done; keep never renders.
-export type TileStatus = 'keep' | 'generating' | 'done' | 'failed' | 'refused';
+// A pre-rendered preview fills in until it is done; keep never renders. On
+// another angle a style renders only once tapped: unrequested until then.
+export type TileStatus = 'keep' | 'unrequested' | 'generating' | 'done' | 'failed' | 'refused';
 
 export interface Tile {
   style: CatalogStyle;
@@ -66,16 +67,16 @@ export function tilesFor(
   dimension: StyleDimension,
   catalog: Catalog,
   previews: VisitPreview[],
-  slot: PhotoSlot,
+  angle: PhotoSlot,
   photoUrl: string | null,
 ): Tile[] {
   return catalog[dimension].map((style) => {
     if (style === catalog.keep[dimension]) return { style, status: 'keep', imageUrl: photoUrl, preview: null };
     const preview =
       dimension === 'hair'
-        ? previewFor(previews, style.id, catalog.keep.beard.id, slot)
-        : previewFor(previews, catalog.keep.hair.id, style.id, slot);
-    const status = statusOf(preview);
+        ? previewFor(previews, style.id, catalog.keep.beard.id, angle)
+        : previewFor(previews, catalog.keep.hair.id, style.id, angle);
+    const status = !preview && angle !== 'front' ? 'unrequested' : statusOf(preview);
     const imageUrl = status === 'done' ? (preview?.thumbnailUrl ?? style.referenceImageUrl) : style.referenceImageUrl;
     return { style, status, imageUrl, preview };
   });

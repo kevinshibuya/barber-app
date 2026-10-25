@@ -112,7 +112,9 @@ describe('the picker angle pager', () => {
     expect(imageUri(tileImage('Degradê baixo'))).toBe('https://previews.test/pv-low-fade@left.thumb.jpg');
     expect(imageUri(tileImage(strings.picker.tile.keep))).toBe(LEFT_URL);
     expect(imageUri(tileImage('Topete'))).toBe('https://styles.test/hair/quiff.png');
-    expect(within(tile('Topete')).getByText(strings.picker.tile.generating)).toBeOnTheScreen();
+    // Nothing renders Topete on this angle until it is tapped, so it does not say generating.
+    expect(within(tile('Topete')).getByText(strings.picker.tile.unrequested)).toBeOnTheScreen();
+    expect(within(tile('Topete')).queryByText(strings.picker.tile.generating)).toBeNull();
     expect(tile('Degradê baixo')).toBeSelected();
 
     await fireEvent.press(pill(strings.picker.angle.front));
