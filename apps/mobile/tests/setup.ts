@@ -2,6 +2,7 @@
 // Jest's automatic mock, and each test scripts the functions it needs with
 // `jest.mocked(api.someFunction)`. Tests of the `api` module itself import
 // its files directly (`@/api/auth`), which this mock does not cover.
+import { Image } from 'expo-image';
 import * as api from '@/api';
 
 jest.mock('@/api');
@@ -20,3 +21,9 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 // expo-crypto is native; Node's Web Crypto makes the same v4 UUIDs.
 jest.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }));
+
+// expo-image's prefetch is native; a screen warming the image cache sees it
+// succeed unless a test scripts otherwise.
+beforeEach(() => {
+  jest.spyOn(Image, 'prefetch').mockReset().mockResolvedValue(true);
+});

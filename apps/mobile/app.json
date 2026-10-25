@@ -42,7 +42,8 @@
           "photosPermission": "O Barber usa suas fotos para escolher uma foto do cliente e gerar as prévias de corte.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

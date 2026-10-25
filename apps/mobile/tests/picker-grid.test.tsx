@@ -5,6 +5,7 @@ import * as api from '@/api';
 import type { VisitPreview } from '@/api';
 import { strings } from '@/lib/strings';
 import { client, openVisit, uploadedPhoto } from './support/fixtures';
+import { imageUri } from './support/image';
 import { CATALOG, previewOf } from './support/picker';
 
 const FRONT_URL = 'https://storage.test/front.jpg';
@@ -91,9 +92,9 @@ describe('picker grid', () => {
       strings.picker.tile.keep,
       ...HAIR_STYLES,
     ]);
-    expect(tileImage(strings.picker.tile.keep)).toHaveProp('source', { uri: FRONT_URL });
-    expect(tileImage('Degradê baixo')).toHaveProp('source', { uri: 'https://styles.test/hair/low-fade.png' });
-    expect(tileImage('Topete')).toHaveProp('source', { uri: 'https://styles.test/hair/quiff.png' });
+    expect(imageUri(tileImage(strings.picker.tile.keep))).toBe(FRONT_URL);
+    expect(imageUri(tileImage('Degradê baixo'))).toBe('https://styles.test/hair/low-fade.png');
+    expect(imageUri(tileImage('Topete'))).toBe('https://styles.test/hair/quiff.png');
     for (const name of HAIR_STYLES) {
       expect(within(tile(name)).getByText(name)).toBeOnTheScreen();
       expect(within(tile(name)).getByText(strings.picker.tile.generating)).toBeOnTheScreen();
@@ -101,26 +102,26 @@ describe('picker grid', () => {
     expect(within(tile(strings.picker.tile.keep)).queryByText(strings.picker.tile.generating)).toBeNull();
 
     await emit([previewOf('low-fade', 'running'), previewOf('buzz-cut', 'pending')]);
-    expect(tileImage('Degradê baixo')).toHaveProp('source', { uri: 'https://styles.test/hair/low-fade.png' });
+    expect(imageUri(tileImage('Degradê baixo'))).toBe('https://styles.test/hair/low-fade.png');
 
     await emit([previewOf('low-fade', 'done'), previewOf('buzz-cut', 'pending')]);
 
-    expect(tileImage('Degradê baixo')).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.thumb.jpg' });
+    expect(imageUri(tileImage('Degradê baixo'))).toBe('https://previews.test/pv-low-fade.thumb.jpg');
     expect(within(tile('Degradê baixo')).queryByText(strings.picker.tile.generating)).toBeNull();
     expect(within(tile('Máquina')).getByText(strings.picker.tile.generating)).toBeOnTheScreen();
-    expect(tileImage('Máquina')).toHaveProp('source', { uri: 'https://styles.test/hair/buzz-cut.png' });
+    expect(imageUri(tileImage('Máquina'))).toBe('https://styles.test/hair/buzz-cut.png');
 
     await showTab('beard');
 
     expect(screen.getByRole('tab', { name: strings.picker.tab.beard })).toBeSelected();
     expect(screen.queryByRole('button', { name: 'Degradê baixo' })).toBeNull();
-    expect(tileImage(strings.picker.tile.keep)).toHaveProp('source', { uri: FRONT_URL });
-    expect(tileImage('Barba por fazer')).toHaveProp('source', { uri: 'https://styles.test/beard/stubble.png' });
-    expect(tileImage('Cavanhaque')).toHaveProp('source', { uri: 'https://styles.test/beard/goatee.png' });
+    expect(imageUri(tileImage(strings.picker.tile.keep))).toBe(FRONT_URL);
+    expect(imageUri(tileImage('Barba por fazer'))).toBe('https://styles.test/beard/stubble.png');
+    expect(imageUri(tileImage('Cavanhaque'))).toBe('https://styles.test/beard/goatee.png');
 
     await emit([previewOf('low-fade', 'done'), previewOf('buzz-cut', 'pending'), previewOf('goatee', 'done')]);
 
-    expect(tileImage('Cavanhaque')).toHaveProp('source', { uri: 'https://previews.test/pv-goatee.thumb.jpg' });
+    expect(imageUri(tileImage('Cavanhaque'))).toBe('https://previews.test/pv-goatee.thumb.jpg');
     expect(within(tile('Barba por fazer')).getByText(strings.picker.tile.generating)).toBeOnTheScreen();
     for (const name of BEARD_STYLES) expect(within(tile(name)).getByText(name)).toBeOnTheScreen();
   });
@@ -152,7 +153,7 @@ describe('picker grid', () => {
     const router = await openPicker();
 
     expect(tile(strings.picker.tile.keep)).toBeSelected();
-    expect(lookImage()).toHaveProp('source', { uri: FRONT_URL });
+    expect(imageUri(lookImage())).toBe(FRONT_URL);
 
     await fireEvent.press(chooseButton());
 
@@ -175,12 +176,12 @@ describe('picker grid', () => {
     // Selected while it fills in: the reference shows, and it cannot be chosen yet.
     expect(tile('Degradê baixo')).toBeSelected();
     expect(tile(strings.picker.tile.keep)).not.toBeSelected();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://styles.test/hair/low-fade.png' });
-    expect(chooseButton()).toBeDisabled();
+    expect(imageUri(lookImage())).toBe('https://styles.test/hair/low-fade.png');
+    expect(screen.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([previewOf('low-fade', 'done')]);
 
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     await waitFor(() => expect(chooseButton()).toBeEnabled());
 
     await fireEvent.press(chooseButton());
@@ -201,7 +202,7 @@ describe('picker grid', () => {
     await showTab('beard');
     await fireEvent.press(tile('Cavanhaque'));
 
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-goatee.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-goatee.jpg');
     await fireEvent.press(chooseButton());
 
     expect(api.chooseLook).toHaveBeenCalledWith('v1', {
@@ -224,7 +225,7 @@ describe('picker grid', () => {
     expect(await screen.findByRole('button', { name: strings.picker.chosen })).toBeDisabled();
     expect(tile('Máquina')).toBeSelected();
     expect(tile(strings.picker.tile.keep)).not.toBeSelected();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-buzz-cut.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-buzz-cut.jpg');
 
     await fireEvent.press(tile('Topete'));
 
@@ -253,7 +254,7 @@ describe('picker grid', () => {
 
     await fireEvent.press(tile('Topete'));
 
-    expect(chooseButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.locked.afterPhoto })).toBeDisabled();
   });
 
   it('locks the look on a picker gone back to after the after photo was taken', async () => {
@@ -279,7 +280,7 @@ describe('picker grid', () => {
     await waitFor(() => expect(router.getPathname()).toBe('/visits/v1/picker'));
     await fireEvent.press(tile('Topete'));
 
-    await waitFor(() => expect(chooseButton()).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: strings.picker.locked.afterPhoto })).toBeDisabled());
   });
 
   it('offers again a pair whose chosen preview a retake replaced', async () => {

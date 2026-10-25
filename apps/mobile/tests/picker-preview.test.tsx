@@ -1,10 +1,10 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
 import { renderRouter } from 'expo-router/testing-library';
 import * as api from '@/api';
 import type { VisitPreview } from '@/api';
 import { strings } from '@/lib/strings';
 import { client, openVisit, uploadedPhoto } from './support/fixtures';
+import { imageUri } from './support/image';
 import { CATALOG, pairPreview, previewOf } from './support/picker';
 
 const FRONT_URL = 'https://storage.test/front.jpg';
@@ -72,10 +72,7 @@ async function openFullScreen() {
 
 // A swipe that settles on the page.
 async function swipeTo(page: number) {
-  const { width } = Dimensions.get('window');
-  await fireEvent(fullScreen().getByTestId('angle-pager'), 'momentumScrollEnd', {
-    nativeEvent: { contentOffset: { x: page * width, y: 0 } },
-  });
+  await fireEvent(fullScreen().getByTestId('angle-pager'), 'pageSelected', { nativeEvent: { position: page } });
 }
 
 const PRE_RENDERED = [previewOf('low-fade', 'done'), previewOf('goatee', 'done')];
@@ -95,16 +92,16 @@ describe('hair-plus-beard combinations', () => {
       beardStyleId: 'beard-goatee',
       slot: 'front',
     });
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     expect(await screen.findByText(strings.picker.preview.combining)).toBeOnTheScreen();
-    expect(chooseButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'goatee', 'running')]);
     expect(screen.getByText(strings.picker.preview.combining)).toBeOnTheScreen();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'goatee', 'done')]);
 
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade+goatee.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade+goatee.jpg');
     expect(screen.queryByText(strings.picker.preview.combining)).toBeNull();
     await waitFor(() => expect(chooseButton()).toBeEnabled());
   });
@@ -118,7 +115,7 @@ describe('hair-plus-beard combinations', () => {
 
     expect(screen.getByText(strings.picker.preview.comboRefused)).toBeOnTheScreen();
     expect(screen.queryByText(strings.picker.preview.combining)).toBeNull();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     expect(chooseButton()).toBeDisabled();
     await fireEvent.press(chooseButton());
     expect(api.chooseLook).not.toHaveBeenCalled();
@@ -127,7 +124,7 @@ describe('hair-plus-beard combinations', () => {
     await fireEvent.press(screen.getByRole('button', { name: strings.picker.tile.keep }));
 
     expect(screen.queryByText(strings.picker.preview.comboRefused)).toBeNull();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(lookImage())).toBe('https://previews.test/pv-low-fade.jpg');
     await waitFor(() => expect(chooseButton()).toBeEnabled());
     await fireEvent.press(chooseButton());
 
@@ -163,8 +160,9 @@ describe('the full-screen preview', () => {
     expect(view.getByRole('tab', { name: strings.picker.angle.front })).toBeSelected();
     expect(view.getByRole('tab', { name: strings.picker.angle.left })).not.toBeSelected();
     expect(view.queryByRole('tab', { name: strings.picker.angle.right })).toBeNull();
-    expect(view.getByTestId('angle-image-front')).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    expect(imageUri(view.getByTestId('angle-image-front'))).toBe('https://previews.test/pv-low-fade.jpg');
     expect(api.requestPreview).not.toHaveBeenCalled();
+    expect(view.getByTestId('angle-image-front').props.cachePolicy).toBe('memory-disk');
 
     await swipeTo(1);
 
@@ -176,18 +174,16 @@ describe('the full-screen preview', () => {
       slot: 'left',
     });
     expect(view.getByRole('tab', { name: strings.picker.angle.left })).toBeSelected();
-    expect(view.getByTestId('angle-image-left')).toHaveProp('source', { uri: LEFT_URL });
+    expect(imageUri(view.getByTestId('angle-image-left'))).toBe(LEFT_URL);
     expect(await view.findByText(strings.picker.angle.generating)).toBeOnTheScreen();
-    expect(view.getByRole('button', { name: strings.picker.choose })).toBeDisabled();
+    expect(view.getByRole('button', { name: strings.picker.choosePending })).toBeDisabled();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'keep', 'running', { slot: 'left' })]);
     expect(view.getByText(strings.picker.angle.generating)).toBeOnTheScreen();
 
     await emit([...PRE_RENDERED, pairPreview('low-fade', 'keep', 'done', { slot: 'left' })]);
 
-    expect(view.getByTestId('angle-image-left')).toHaveProp('source', {
-      uri: 'https://previews.test/pv-low-fade@left.jpg',
-    });
+    expect(imageUri(view.getByTestId('angle-image-left'))).toBe('https://previews.test/pv-low-fade@left.jpg');
     expect(view.queryByText(strings.picker.angle.generating)).toBeNull();
     expect(api.requestPreview).toHaveBeenCalledTimes(1);
   });
@@ -208,7 +204,8 @@ describe('the full-screen preview', () => {
 
     expect(screen.queryByTestId('full-screen-preview')).toBeNull();
     expect(screen.getByRole('button', { name: 'Degradê baixo' })).toBeSelected();
-    expect(lookImage()).toHaveProp('source', { uri: 'https://previews.test/pv-low-fade.jpg' });
+    // The picker stays on the angle full screen was on.
+    expect(imageUri(lookImage())).toBe(LEFT_URL);
   });
 
   it('chooses the combination from full screen with its preview id', async () => {
@@ -219,9 +216,7 @@ describe('the full-screen preview', () => {
 
     const view = await openFullScreen();
 
-    expect(view.getByTestId('angle-image-front')).toHaveProp('source', {
-      uri: 'https://previews.test/pv-low-fade+goatee.jpg',
-    });
+    expect(imageUri(view.getByTestId('angle-image-front'))).toBe('https://previews.test/pv-low-fade+goatee.jpg');
     await fireEvent.press(view.getByRole('button', { name: strings.picker.choose }));
 
     expect(api.chooseLook).toHaveBeenCalledWith('v1', {
