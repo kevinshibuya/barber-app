@@ -1,13 +1,15 @@
+import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import type { Tile } from '@/lib/picker';
 import { strings } from '@/lib/strings';
 import { cn } from '@/lib/utils';
-import { ActivityIndicator, Image, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 // The caption's scrim, darkest at the tile's bottom edge (graft B).
 export const CAPTION_SCRIM = { backgroundImage: 'linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent)' };
 
 const STATUS_LINE = {
+  unrequested: strings.picker.tile.unrequested,
   generating: strings.picker.tile.generating,
   failed: strings.picker.tile.failed,
   refused: strings.picker.tile.refused,
@@ -42,7 +44,7 @@ export function PickerTile({
       className={cn('bg-muted overflow-hidden rounded-xl border-[3px]', selected ? 'border-primary' : 'border-transparent')}
     >
       {tile.imageUrl && (
-        <Image testID="tile-image" source={{ uri: tile.imageUrl }} resizeMode="cover" className="absolute inset-0" />
+        <Image testID="tile-image" source={{ uri: tile.imageUrl }} contentFit="cover" className="absolute inset-0" />
       )}
       <View style={CAPTION_SCRIM} className="absolute inset-x-0 bottom-0 gap-0.5 px-2 pb-2 pt-6">
         <Text numberOfLines={2} className="text-sm font-medium text-white">
