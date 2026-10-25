@@ -1,11 +1,13 @@
+import { AnglePager, AnglePills } from '@/components/angle-pager';
 import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { FormError } from '@/components/form-error';
 import { FullScreenPreview } from '@/components/full-screen-preview';
-import { ChoosePill, LookStatus } from '@/components/look-status';
+import { ChoosePill, LookStatus, type LockReason } from '@/components/look-status';
 import { PickerTile } from '@/components/picker-tile';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
+import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import {
   chooseLook,
@@ -36,7 +38,7 @@ import { type PhotoSlot, STYLE_DIMENSIONS, type StyleDimension, type Visit } fro
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // The header's scrim, darkest at the top edge, so its white text reads on any photo.
@@ -48,8 +50,8 @@ interface PickerData {
   visit: Visit;
   clientName: string;
   catalog: Catalog;
-  frontPhotoUrl: string | null;
-  // The uploaded photos in slot order: the full-screen preview's pages.
+  // The uploaded photos in angle order: the pager's pages. The front alone,
+  // without a photo, when none is uploaded yet.
   angles: { slot: PhotoSlot; url: string | null }[];
 }
 
@@ -61,16 +63,22 @@ async function loadPicker(visitId: string): Promise<PickerData> {
   const angles = photos
     .filter((photo) => photo.uploadStatus === 'uploaded')
     .map((photo) => ({ slot: photo.slot, url: photo.url }));
-  const front = angles.find((angle) => angle.slot === 'front');
-  return { visit, clientName: found.name, catalog, frontPhotoUrl: front?.url ?? null, angles };
+  return {
+    visit,
+    clientName: found.name,
+    catalog,
+    angles: angles.length > 0 ? angles : [{ slot: 'front', url: null }],
+  };
 }
 
 // The picker of a visit, after docs/design/picker-references.md: the selected
 // look large on top (the spine's preview, with graft D's header and the
 // floating choose pill), and below it the hair and beard tabs over a grid of
-// tiles that fill in as the visit's previews render. Tapping the look opens
-// it full screen, across the visit's other angles. Combinations and other
-// angles render on demand, requested the first time they are shown.
+// tiles that fill in as the visit's previews render. The look is a pager over
+// the visit's angles, with angle pills on the photo; the angle on screen is
+// the one the grid and full screen show. Tapping the look opens it full
+// screen. Combinations and other angles render on demand, requested the first
+// time they are shown.
 export default function PickerScreen() {
   const router = useRouter();
   const { id: visitId } = useLocalSearchParams<{ id: string }>();
@@ -85,7 +93,8 @@ export default function PickerScreen() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [fullScreen, setFullScreen] = useState(false);
-  const [page, setPage] = useState(0);
+  // The angle on screen; the selection is the same on every angle.
+  const [angle, setAngle] = useState<PhotoSlot>('front');
   // Requests sent this visit, and those that failed before a row existed.
   const requested = useRef(new Set<string>());
   const [unrequested, setUnrequested] = useState<ReadonlySet<string>>(new Set());
@@ -125,27 +134,28 @@ export default function PickerScreen() {
     }, [visitId]),
   );
 
-  useEffect(() => subscribeToPreviews(visitId, setPreviews), [visitId]);
+  // Each delivery of the feed warms the image cache with the done previews.
+  const [prefetch] = useState(previewPrefetcher);
+  useEffect(
+    () =>
+      subscribeToPreviews(visitId, (delivered) => {
+        setPreviews(delivered);
+        prefetch(delivered);
+      }),
+    [visitId, prefetch],
+  );
 
-  // The look on the front, which the picker shows, and on every angle, which
-  // the full-screen pages show.
-  const front =
-    data && selection
-      ? settle(lookFor(selection, data.catalog, previews, 'front', data.frontPhotoUrl), unrequested)
-      : null;
+  // The look on every angle, as the pages show it, and the one on screen.
   const looks =
     data && selection
-      ? data.angles.map((angle) =>
-          settle(lookFor(selection, data.catalog, previews, angle.slot, angle.url), unrequested),
-        )
+      ? data.angles.map((page) => settle(lookFor(selection, data.catalog, previews, page.slot, page.url), unrequested))
       : [];
-  const shown = [front, fullScreen ? looks[page] : null];
+  const shown = looks.find((look) => look.slot === angle) ?? looks[0] ?? null;
 
-  // Asks once for each on-demand look shown without a row; a retry asks again.
+  // Asks once for the look on screen while it is on demand without a row; a
+  // retry asks again.
   useEffect(() => {
-    for (const look of shown) {
-      if (look?.request && !requested.current.has(requestKey(look.request))) void request(look.request);
-    }
+    if (shown?.request && !requested.current.has(requestKey(shown.request))) void request(shown.request);
   });
 
   async function request(pair: PairRequest) {
@@ -215,8 +225,11 @@ export default function PickerScreen() {
     );
   }
 
-  const { visit, catalog, frontPhotoUrl } = data;
-  const look = front!;
+  const { visit, catalog } = data;
+  const look = shown!;
+  const angles = data.angles.map((page) => page.slot);
+  const current = look.slot;
+  const photoUrl = data.angles.find((page) => page.slot === current)?.url ?? null;
   // A recorded look has its preview, unless it is keep with keep, which has none.
   const keepBoth = selection.hair === catalog.keep.hair.id && selection.beard === catalog.keep.beard.id;
   const chosen =
@@ -224,7 +237,8 @@ export default function PickerScreen() {
     visit.chosenBeardStyleId === selection.beard &&
     (keepBoth || visit.chosenPreviewId !== null);
   // Once the after photo is taken, or the visit closed, the look is the record.
-  const locked = visit.afterPhotoPath !== null || visit.status === 'closed';
+  const locked: LockReason | null =
+    visit.afterPhotoPath !== null ? 'afterPhoto' : visit.status === 'closed' ? 'closed' : null;
   const tileWidth = (width - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
 
   async function choose(chosenLook: LookPreview) {
@@ -247,11 +261,6 @@ export default function PickerScreen() {
     }
   }
 
-  function openFullScreen() {
-    setPage(0);
-    setFullScreen(true);
-  }
-
   const pill = (shownLook: LookPreview) => (
     <ChoosePill
       look={shownLook}
@@ -267,45 +276,64 @@ export default function PickerScreen() {
       {fullScreen && (
         <FullScreenPreview
           looks={looks}
-          page={page}
-          onPage={setPage}
+          angle={current}
+          onAngle={setAngle}
           onClose={() => setFullScreen(false)}
           onRetry={retryLook}
           choose={pill}
         />
       )}
       <View className="bg-muted flex-[3] justify-between">
-        <Pressable
-          role="button"
-          accessibilityLabel={strings.picker.a11y.openPreview}
-          disabled={looks.length === 0}
-          onPress={openFullScreen}
-          className="absolute inset-0"
-        >
-          {look.imageUrl && (
-            <Image
-              testID="look-image"
-              source={{ uri: look.imageUrl }}
-              resizeMode="cover"
-              className="absolute inset-0"
-            />
-          )}
-        </Pressable>
-        <SafeAreaView edges={['top']} style={HEADER_SCRIM} className="flex-row items-center px-2 pb-6">
-          <Pressable role="button" accessibilityLabel={strings.picker.a11y.back} onPress={back} className="p-2">
-            <Icon as={ArrowLeft} size={24} className="text-white" />
-          </Pressable>
-          <View className="flex-1 items-center">
-            <Text numberOfLines={1} className="text-center text-base font-semibold text-white">
-              {data.clientName}
-            </Text>
-            <ConnectivityIndicator inverted />
+        <AnglePager
+          angles={angles}
+          angle={current}
+          onAngle={setAngle}
+          style={StyleSheet.absoluteFill}
+          renderPage={(pageAngle, onScreen) => {
+            const pageLook = looks.find((entry) => entry.slot === pageAngle);
+            // Only the page on screen is the button and the look image.
+            return (
+              <Pressable
+                role={onScreen ? 'button' : undefined}
+                accessibilityLabel={onScreen ? strings.picker.a11y.openPreview : undefined}
+                onPress={() => setFullScreen(true)}
+                className="flex-1"
+              >
+                {/* No transition and no recycling key: a new look replaces the
+                    last one only once it is decoded, so the photo never blanks.
+                    The memory cache is the one the prefetch filled. */}
+                {pageLook?.imageUrl && (
+                  <Image
+                    testID={onScreen ? 'look-image' : undefined}
+                    source={{ uri: pageLook.imageUrl }}
+                    cachePolicy="memory-disk"
+                    contentFit="cover"
+                    transition={0}
+                    className="absolute inset-0"
+                  />
+                )}
+              </Pressable>
+            );
+          }}
+        />
+        <SafeAreaView edges={['top']} style={HEADER_SCRIM} className="gap-2 px-2 pb-6" pointerEvents="box-none">
+          <View className="flex-row items-center">
+            <Pressable role="button" accessibilityLabel={strings.picker.a11y.back} onPress={back} className="p-2">
+              <Icon as={ArrowLeft} size={24} className="text-white" />
+            </Pressable>
+            <View className="flex-1 items-center">
+              <Text numberOfLines={1} className="text-center text-base font-semibold text-white">
+                {data.clientName}
+              </Text>
+              <ConnectivityIndicator inverted />
+            </View>
+            <Button variant="link" size="sm" onPress={finish}>
+              <Text className="text-white">{strings.picker.finish}</Text>
+            </Button>
           </View>
-          <Button variant="link" size="sm" onPress={finish}>
-            <Text className="text-white">{strings.picker.finish}</Text>
-          </Button>
+          <AnglePills angles={angles} angle={current} onAngle={setAngle} className="justify-center" />
         </SafeAreaView>
-        <View className="flex-row items-end justify-between gap-3 p-3">
+        <View className="flex-row items-end justify-between gap-3 p-3" pointerEvents="box-none">
           <View className="flex-1 items-start">
             <LookStatus look={look} onRetry={retryLook} />
           </View>
@@ -344,7 +372,7 @@ export default function PickerScreen() {
           contentContainerStyle={{ padding: GRID_PADDING, paddingBottom: GRID_PADDING + insets.bottom, gap: GRID_GAP }}
           contentContainerClassName="flex-row flex-wrap"
         >
-          {tilesFor(tab, catalog, previews, frontPhotoUrl).map((tile) => (
+          {tilesFor(tab, catalog, previews, current, photoUrl).map((tile) => (
             <PickerTile
               key={tile.style.id}
               tile={tile}
@@ -364,6 +392,27 @@ function without(keys: ReadonlySet<string>, key: string): ReadonlySet<string> {
   const rest = new Set(keys);
   rest.delete(key);
   return rest;
+}
+
+// Fetches the full-size image of each done preview into the image cache (memory
+// and disk, prefetch's default), so a tap on a finished tile draws at once.
+// Thumbnails are not fetched: the grid loads them itself. A URL is fetched
+// once while in flight or once it succeeded; one that failed is fetched again
+// on the next delivery. A renewed signed URL is a new URL, so it is fetched
+// too, which keeps a picker left open warm.
+function previewPrefetcher() {
+  const fetched = new Set<string>();
+  return (previews: VisitPreview[]) => {
+    for (const preview of previews) {
+      const url = preview.status === 'done' && !preview.purgedAt ? preview.imageUrl : null;
+      if (!url || fetched.has(url)) continue;
+      fetched.add(url);
+      Image.prefetch(url).then(
+        (ok) => ok || fetched.delete(url),
+        () => fetched.delete(url),
+      );
+    }
+  };
 }
 
 // A look whose request failed before its row existed reads as failed, so a
