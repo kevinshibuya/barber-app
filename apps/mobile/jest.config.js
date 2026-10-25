@@ -5,7 +5,11 @@ module.exports = {
   testRegex: '\\.test\\.tsx?$',
   // jest-expo turns this on; a gate naming a missing test file must fail.
   passWithNoTests: false,
+  // Gesture handler's native module is mocked before any test file loads it.
+  setupFiles: ['react-native-gesture-handler/jestSetup'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  // Reanimated and worklets run their JS implementations in tests.
+  resolver: '<rootDir>/tests/support/resolver.js',
   // A file's first `renderRouter` loads every route; on a machine busy with
   // parallel gates that alone can pass Jest's 5 s default.
   testTimeout: 30_000,
@@ -15,6 +19,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
     '^@barber/shared$': '<rootDir>/../../packages/shared/src',
     '^lucide-react-native$': '<rootDir>/tests/stubs/lucide.js',
+    '^react-native-pager-view$': '<rootDir>/tests/stubs/pager-view.js',
   },
   // jest-expo's list, plus the UI libraries that ship untranspiled JSX.
   transformIgnorePatterns: [

@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import type { LookPreview } from '@/lib/picker';
 import { strings } from '@/lib/strings';
+import { THEME } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { useColorScheme } from 'nativewind';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 function statusText(look: LookPreview): string | null {
@@ -55,8 +57,12 @@ export function LookStatus({
   );
 }
 
+// Why the visit's look can no longer change.
+export type LockReason = 'afterPhoto' | 'closed';
+
 // The spine's floating pill: chooses the look once it is done, and reads as
-// chosen while the pair on screen is the visit's look.
+// chosen while the pair on screen is the visit's look. Disabled, it says why:
+// the look is locked, and by what, or the look on screen is still rendering.
 export function ChoosePill({
   look,
   chosen,
@@ -66,18 +72,30 @@ export function ChoosePill({
 }: {
   look: LookPreview;
   chosen: boolean;
-  // The visit's look can no longer change.
-  locked: boolean;
+  locked: LockReason | null;
   saving: boolean;
   onChoose: (look: LookPreview) => void;
 }) {
+  const { colorScheme } = useColorScheme();
+  const pending = look.status === 'generating' || look.status === 'combining';
+  const label = chosen
+    ? strings.picker.chosen
+    : locked
+      ? strings.picker.locked[locked]
+      : pending
+        ? strings.picker.choosePending
+        : strings.picker.choose;
   return (
     <Button
       className="rounded-full px-6"
-      disabled={look.status !== 'done' || chosen || locked || saving}
+      accessibilityLabel={label}
+      disabled={look.status !== 'done' || chosen || locked !== null || saving}
       onPress={() => onChoose(look)}
     >
-      <Text className="font-bold">{chosen ? strings.picker.chosen : strings.picker.choose}</Text>
+      {label === strings.picker.choosePending && (
+        <ActivityIndicator size="small" color={THEME[colorScheme ?? 'light'].primaryForeground} />
+      )}
+      <Text className="font-bold">{label}</Text>
     </Button>
   );
 }

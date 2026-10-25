@@ -7,6 +7,7 @@ import { type PreviewsTransport, previewFeed } from '@/api/previews';
 import { type PickResult, pickPhoto } from '@/lib/pick-photo';
 import { strings } from '@/lib/strings';
 import { client, openVisit, uploadedPhoto } from './support/fixtures';
+import { imageUri } from './support/image';
 import { CATALOG, previewOf } from './support/picker';
 
 // The camera and the gallery are the device's; each test scripts the shot.
@@ -157,7 +158,7 @@ describe('the picker on bad wifi', () => {
     await screen.findByRole('tab', { name: strings.picker.tab.hair });
     await network.subscribed();
     const tileImage = () => within(screen.getByRole('button', { name: 'Degradê baixo' })).getByTestId('tile-image');
-    expect(tileImage()).toHaveProp('source', { uri: 'https://styles.test/hair/low-fade.png' });
+    expect(imageUri(tileImage())).toBe('https://styles.test/hair/low-fade.png');
 
     await network.drop();
     await network.restore([previewOf('low-fade', 'done')]);
@@ -165,9 +166,7 @@ describe('the picker on bad wifi', () => {
     await waitFor(() => expect(network.subscriptions()).toBe(2));
     await network.subscribed();
 
-    await waitFor(() =>
-      expect(tileImage()).toHaveProp('source', { uri: 'https://signed.test/s1/v1/pv-low-fade.thumb.jpg' }),
-    );
+    await waitFor(() => expect(imageUri(tileImage())).toBe('https://signed.test/s1/v1/pv-low-fade.thumb.jpg'));
   });
 
   it('shows the connectivity indicator while the previews channel is down', async () => {

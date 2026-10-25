@@ -1,6 +1,7 @@
 import { ConnectivityIndicator } from '@/components/connectivity-indicator';
 import { FormError } from '@/components/form-error';
 import { PhotoSlotRow } from '@/components/photo-slot-row';
+import { PhotoViewer } from '@/components/photo-viewer';
 import { Screen } from '@/components/screen';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -16,12 +17,15 @@ import { ScrollView, View } from 'react-native';
 // The four slots of a visit. A slot uploads the moment it is filled, through
 // the upload queue, which retries on bad wifi and after the app closes; a
 // queued slot waits for the connection rather than failing. A resumed visit
-// shows the photos it already has.
+// shows the photos it already has. A filled slot's thumbnail opens the shot
+// full screen, where it can be retaken.
 export default function PhotosScreen() {
   const router = useRouter();
   const { id: visitId } = useLocalSearchParams<{ id: string }>();
   const [slots, dispatch] = useReducer(photoSlotsReducer, undefined, emptySlots);
   const [cameraDenied, setCameraDenied] = useState(false);
+  const [viewing, setViewing] = useState<PhotoSlot | null>(null);
+  const viewed = viewing && slots[viewing].image;
 
   useEffect(() => {
     let current = true;
@@ -49,7 +53,10 @@ export default function PhotosScreen() {
   async function shoot(slot: PhotoSlot, source: PhotoSource) {
     const result = await pickPhoto(source);
     setCameraDenied(result.status === 'denied');
-    if (result.status === 'picked') await upload(slot, result.image);
+    if (result.status !== 'picked') return;
+    // A retake from the viewer hands back to the row, which shows its state.
+    setViewing(null);
+    await upload(slot, result.image);
   }
 
   function retry(slot: PhotoSlot) {
@@ -72,6 +79,7 @@ export default function PhotosScreen() {
             state={slots[slot]}
             required={slot === REQUIRED_SLOT}
             onShoot={(source) => void shoot(slot, source)}
+            onView={() => setViewing(slot)}
             onRetry={() => retry(slot)}
           />
         ))}
@@ -82,6 +90,16 @@ export default function PhotosScreen() {
           <Text>{strings.photos.continue}</Text>
         </Button>
       </ScrollView>
+      {viewing && viewed && (
+        <PhotoViewer
+          angle={viewing}
+          image={viewed}
+          busy={slots[viewing].status === 'uploading'}
+          cameraDenied={cameraDenied}
+          onShoot={(source) => void shoot(viewing, source)}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </Screen>
   );
 }

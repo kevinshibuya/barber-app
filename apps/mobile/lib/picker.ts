@@ -3,13 +3,14 @@
 import { KEEP_STYLE_SLUG, type PhotoSlot, type StyleDimension } from '@barber/shared';
 import type { CatalogStyle, PreviewRequest, VisitPreview } from '@/api';
 
-// A pre-rendered preview fills in until it is done; keep never renders.
-export type TileStatus = 'keep' | 'generating' | 'done' | 'failed' | 'refused';
+// A pre-rendered preview fills in until it is done; keep never renders. On
+// another angle a style renders only once tapped: unrequested until then.
+export type TileStatus = 'keep' | 'unrequested' | 'generating' | 'done' | 'failed' | 'refused';
 
 export interface Tile {
   style: CatalogStyle;
   status: TileStatus;
-  // The thumbnail once done, the reference image until then; the front photo for keep.
+  // The thumbnail once done, the reference image until then; the angle's photo for keep.
   imageUrl: string | null;
   preview: VisitPreview | null;
 }
@@ -60,20 +61,22 @@ function statusOf(preview: VisitPreview | null): TileStatus {
   return preview.status;
 }
 
-// The tiles of one tab: each style rendered with the other dimension kept.
+// The tiles of one tab on one angle: each style rendered with the other
+// dimension kept.
 export function tilesFor(
   dimension: StyleDimension,
   catalog: Catalog,
   previews: VisitPreview[],
-  frontPhotoUrl: string | null,
+  angle: PhotoSlot,
+  photoUrl: string | null,
 ): Tile[] {
   return catalog[dimension].map((style) => {
-    if (style === catalog.keep[dimension]) return { style, status: 'keep', imageUrl: frontPhotoUrl, preview: null };
+    if (style === catalog.keep[dimension]) return { style, status: 'keep', imageUrl: photoUrl, preview: null };
     const preview =
       dimension === 'hair'
-        ? previewFor(previews, style.id, catalog.keep.beard.id)
-        : previewFor(previews, catalog.keep.hair.id, style.id);
-    const status = statusOf(preview);
+        ? previewFor(previews, style.id, catalog.keep.beard.id, angle)
+        : previewFor(previews, catalog.keep.hair.id, style.id, angle);
+    const status = !preview && angle !== 'front' ? 'unrequested' : statusOf(preview);
     const imageUrl = status === 'done' ? (preview?.thumbnailUrl ?? style.referenceImageUrl) : style.referenceImageUrl;
     return { style, status, imageUrl, preview };
   });
