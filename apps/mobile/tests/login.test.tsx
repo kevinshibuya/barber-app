@@ -21,10 +21,10 @@ describe('login', () => {
     jest.mocked(api.signIn).mockResolvedValue({ ok: false, reason: 'wrong-credentials' });
     await renderRouter('./app', { initialUrl: '/' });
 
-    await signInWith('rafa@barbearia.com', 'errada');
+    await signInWith('rafa@example.com', 'errada');
 
     expect(await screen.findByText('E-mail ou senha incorretos.')).toBeOnTheScreen();
-    expect(api.signIn).toHaveBeenCalledWith('rafa@barbearia.com', 'errada');
+    expect(api.signIn).toHaveBeenCalledWith('rafa@example.com', 'errada');
     expect(screen.queryByText(strings.home.recentVisits)).not.toBeOnTheScreen();
   });
 
@@ -33,7 +33,7 @@ describe('login', () => {
     jest.mocked(api.signIn).mockResolvedValue({ ok: true, barber: rafa });
     await renderRouter('./app', { initialUrl: '/' });
 
-    await signInWith('rafa@barbearia.com', 'certa');
+    await signInWith('rafa@example.com', 'certa');
 
     expect(await screen.findByText(strings.home.recentVisits)).toBeOnTheScreen();
     expect(screen.queryByLabelText(strings.login.password)).not.toBeOnTheScreen();

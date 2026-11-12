@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Sets one variable in the box's ~/apps/barber-worker/.env from stdin, so a
+# Sets one variable in the server's ~/apps/barber-worker/.env from stdin, so a
 # secret never lands in argv, shell history or a chat:
-#   pbpaste | BOX=ubuntu@<box-ip> deploy/stack/bin/set-env.sh GEMINI_API_KEY
+#   pbpaste | BOX=<user>@<host> SSH_KEY=<key path> deploy/stack/bin/set-env.sh GEMINI_API_KEY
 # The first run creates .env from .env.example, mode 600. A running worker is
 # recreated so it reads the new value.
 set -euo pipefail
 
-name="${1:?usage: pbpaste | BOX=ubuntu@<box-ip> deploy/stack/bin/set-env.sh <NAME>}"
+name="${1:?usage: pbpaste | BOX=<user>@<host> SSH_KEY=<key path> deploy/stack/bin/set-env.sh <NAME>}"
 [[ $name =~ ^[A-Z_][A-Z0-9_]*$ ]] || { echo "not a variable name: $name" >&2; exit 2; }
-box="${BOX:?set BOX=ubuntu@<box-ip>, the IP is in the README of ts6-server}"
-key="${SSH_KEY:-$HOME/.ssh/ts6_oracle}"
+box="${BOX:?set BOX=<user>@<host>, the server that runs the worker}"
+key="${SSH_KEY:?set SSH_KEY to the private key that logs in to BOX}"
 value="$(cat)"
 [[ -n $value ]] || { echo "nothing on stdin" >&2; exit 1; }
 [[ $value != *$'\n'* ]] || { echo "the value spans lines" >&2; exit 1; }
