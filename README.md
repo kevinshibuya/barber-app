@@ -97,7 +97,7 @@ Expect: a last JSON line with `"message":"Migrations applied"`. Seen here after 
 scripts/db-test.sh '@barber/*' test
 ```
 
-Expect: each package prints `Tests:` with no failures. Not run here to a pass: on a freshly started local Supabase, 35 of the 42 `@barber/shared` tests failed with `Email logins are disabled`, because `[auth.email] enable_signup = false` in `supabase/config.toml` turns the email provider off.
+Expect: each package prints `Tests:` with no failures. Not run here to a pass: see the first entry under If it fails.
 
 4. Start the worker on the fake provider. It reads its variables from the environment, so load the file first.
 
@@ -145,6 +145,7 @@ The mobile suite mocks the database, so it needs no Docker. A passing run ends w
 
 ### If it fails
 
+- **`@barber/shared` tests fail with `Email logins are disabled`.** On a freshly started local Supabase, `[auth.email] enable_signup = false` in `supabase/config.toml` switches the email provider off, and 35 of the 42 tests fail. The likely fix is to set that line to `true`; `[auth] enable_signup = false` still blocks sign-up. Not verified here.
 - **`expo-dev-client` asks for a development build.** Start Metro with `--go` to open the app in Expo Go instead.
 - **A preview stays pending forever.** No worker is running; start step 4, or mark the row done by hand through the service role.
 - **A database script waits on a lock.** Another checkout holds `/tmp/barber-app-db.lock`. It is taken over when its owner process is gone or it is older than 30 minutes.
