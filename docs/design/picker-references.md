@@ -6,14 +6,14 @@ The picker tickets (#14, #15) build from this doc. Every element of the picker t
 
 ## References
 
-All four are App Store listing screenshots, fetched on 2026-10-22 through the iTunes lookup API at full resolution. They are marketing frames, so each shows a finished state; none shows a loading tile.
+All four are App Store listing screenshots, fetched on 2026-10-22 through the iTunes lookup API at full resolution. They are marketing frames, so each shows a finished state; none shows a loading tile. The image files were other companies' artwork and left the repository before it went public; the listing links below lead to them.
 
-| # | File | App | Listing | Screen |
-|---|---|---|---|---|
-| 1 | `references/1-zepeto-avatar-editor.jpg` | ZEPETO: Avatar, Connect & Live (NAVER Z) | https://apps.apple.com/us/app/id1350301428 | Screenshot 2, "Endless Looks and Items": the avatar editor |
-| 2 | `references/2-fadelogic-explore-grid.jpg` | FadeLogic (ELYON AI) | https://apps.apple.com/us/app/id6746824450 | Screenshot 2, "40+ Styles to Explore": the Explore grid |
-| 3 | `references/3-youcam-hairstyle-try-on.jpg` | YouCam Makeup (Perfect Mobile) | https://apps.apple.com/us/app/id863844475 | Screenshot 5, "Hairstyle Try On" |
-| 4 | `references/4-glowify-beard.jpg` | Glowify - AI Hairstyle Try On (Flarial Interactive) | https://apps.apple.com/us/app/id6751491972 | Screenshot 7, "Find Your Best Beard Style": the Beard screen |
+| # | App | Listing | Screen |
+|---|---|---|---|
+| 1 | ZEPETO: Avatar, Connect & Live (NAVER Z) | https://apps.apple.com/us/app/id1350301428 | Screenshot 2, "Endless Looks and Items": the avatar editor |
+| 2 | FadeLogic (ELYON AI) | https://apps.apple.com/us/app/id6746824450 | Screenshot 2, "40+ Styles to Explore": the Explore grid |
+| 3 | YouCam Makeup (Perfect Mobile) | https://apps.apple.com/us/app/id863844475 | Screenshot 5, "Hairstyle Try On" |
+| 4 | Glowify - AI Hairstyle Try On (Flarial Interactive) | https://apps.apple.com/us/app/id6751491972 | Screenshot 7, "Find Your Best Beard Style": the Beard screen |
 
 Looked at and not used: Bitmoji (its editor shows clothing icons, not the user's face, and its other screens are stickers and chat), Beardd (its grids are marketing composites with no app chrome), the rest of the FadeLogic and Glowify screens (face scores, colour analysis).
 
