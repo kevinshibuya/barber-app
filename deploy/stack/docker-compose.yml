@@ -1,8 +1,8 @@
-# barber-worker on the server: the preview queue, the nightly cleanup and the client
-# page, in one container. Caddy (~/apps/caddy) terminates HTTPS and reaches it
-# as barber-worker:3000 on the external `web` network; nothing is published.
-# The caps follow the server repo's docs/a1-resources.md: cpu_shares under Docker's
-# default 1024, so the voice server wins any contention.
+# barber-worker: the preview queue, the nightly cleanup and the client page, in
+# one container. A Caddy on the same server terminates HTTPS and reaches it as
+# barber-worker:3000 on the external `web` network; nothing is published.
+# The server is shared, so the caps are explicit: cpu_shares under Docker's
+# default 1024, so the other services win any contention.
 name: barber-worker
 
 services:
