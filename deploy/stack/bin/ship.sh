@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Ships a release from the Mac to the box: this directory's files to
-# ~/apps/barber-worker/ and the image into the box's Docker, over SSH. No registry.
-#   BOX=ubuntu@<box-ip> deploy/stack/bin/ship.sh <tag>
-# The IP is in ts6-server's README, never in this repo. SSH_KEY defaults to
-# ~/.ssh/ts6_oracle.
+# Ships a release from the build machine to the server: this directory's files
+# to ~/apps/barber-worker/ and the image into the server's Docker, over SSH. No
+# registry.
+#   BOX=<user>@<host> SSH_KEY=<path to private key> deploy/stack/bin/ship.sh <tag>
+# Neither value lives in this repo.
 set -euo pipefail
 
-tag="${1:?usage: BOX=ubuntu@<box-ip> deploy/stack/bin/ship.sh <tag>}"
-box="${BOX:?set BOX=ubuntu@<box-ip>, the IP is in the README of ts6-server}"
-key="${SSH_KEY:-$HOME/.ssh/ts6_oracle}"
+tag="${1:?usage: BOX=<user>@<host> SSH_KEY=<key path> deploy/stack/bin/ship.sh <tag>}"
+box="${BOX:?set BOX=<user>@<host>, the server to ship to}"
+key="${SSH_KEY:?set SSH_KEY to the private key that logs in to BOX}"
 here="$(cd "$(dirname "$0")/.." && pwd)"
 image="barber-worker:$tag"
 docker image inspect "$image" >/dev/null 2>&1 || { echo "missing $image: run bin/build-image.sh first" >&2; exit 1; }

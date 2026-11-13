@@ -16,10 +16,10 @@ describe('password reset', () => {
     await renderRouter('./app', { initialUrl: '/' });
 
     await fireEvent.press(await screen.findByRole('link', { name: strings.login.forgotPassword }));
-    await fireEvent.changeText(await screen.findByLabelText(strings.forgotPassword.email), 'rafa@barbearia.com');
+    await fireEvent.changeText(await screen.findByLabelText(strings.forgotPassword.email), 'rafa@example.com');
     await fireEvent.press(screen.getByRole('button', { name: strings.forgotPassword.submit }));
 
-    expect(api.requestPasswordReset).toHaveBeenCalledWith('rafa@barbearia.com');
+    expect(api.requestPasswordReset).toHaveBeenCalledWith('rafa@example.com');
     expect(await screen.findByText(strings.forgotPassword.sent)).toBeOnTheScreen();
   });
 

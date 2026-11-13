@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# On the box, from ~/apps/barber-worker: points .env at <tag>, starts it, waits
+# On the server, from ~/apps/barber-worker: points .env at <tag>, starts it, waits
 # for it to be healthy, then removes every barber-worker tag that is neither
 # current nor previous. Running it twice with one tag changes nothing.
 #   bash bin/deploy.sh <tag>
-# Never prune images on the box: the shared build cache holds SinusBot's layers.
+# Never prune images on the server: its build cache is shared with other services.
 set -euo pipefail
 
 tag="${1:?usage: bash bin/deploy.sh <tag>}"
